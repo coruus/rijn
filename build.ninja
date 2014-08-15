@@ -5,6 +5,7 @@ asm_osx = ${asm_nix} --oformat=macho64
 asm_lin = ${asm_nix} --oformat=elf64
 asm_arch = ${asm_osx}
 carch = -mavx2 -mbmi2 -march=native
+#carch = -march=native
 cflags = -D__STDC_WANT_LIB_EXT1__=1 -I. -Wextra -std=c11 -O3 $carch
 
 rule asm
@@ -14,8 +15,8 @@ rule static
 rule cexec
   command = clang $cflags -o $out $in
 
-rule ginger
-  command = ./scripts/ginger.py $in > $out
+#rule ginger
+#  command = ./scripts/ginger.py $in > $out
 
 build $b/rijn_k32b32.o: asm rijn_k32b32.s
 build $b/rijn_k32b16.o: asm rijn_k32b16.s
@@ -23,4 +24,5 @@ build $b/rijn_k32ks.o:  asm rijn_k32ks.s
 
 build $b/rijn.a: static $b/rijn_k32ks.o $b/rijn_k32b32.o $b/rijn_k32b16.o
 
-build $b/test: cexec rijn-api.c $b/rijn.a
+#build $b/test: cexec rijn-api.c $b/rijn.a
+build $b/time: cexec test_k32b32.c $b/rijn.a
