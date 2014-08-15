@@ -1,0 +1,26 @@
+b = build
+
+asm_nix = --prefix=_ --machine=amd64
+asm_osx = ${asm_nix} --oformat=macho64
+asm_lin = ${asm_nix} --oformat=elf64
+asm_arch = ${asm_osx}
+carch = -mavx2 -mbmi2 -march=native
+cflags = -D__STDC_WANT_LIB_EXT1__=1 -I. -Wextra -std=c11 -O3 $carch
+
+rule asm
+  command = yasm $asm_arch $in -o $out
+rule static
+  command = libtool -static -o $out $in
+rule cexec
+  command = clang $cflags -o $out $in
+
+rule ginger
+  command = ./scripts/ginger.py $in > $out
+
+build $b/rijn_k32b32.o: asm rijn_k32b32.s
+build $b/rijn_k32b16.o: asm rijn_k32b16.s
+build $b/rijn_k32ks.o:  asm rijn_k32ks.s
+
+build $b/rijn.a: static $b/rijn_k32ks.o $b/rijn_k32b32.o $b/rijn_k32b16.o
+
+build $b/test: cexec rijn-api.c $b/rijn.a
