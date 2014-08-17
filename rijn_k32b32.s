@@ -36,24 +36,6 @@ _sel2:
   db 0,    0,    0, 0xff
   dq 0, 0
 
-_sel1:
-  db 0xff, 0,    0,    0
-  db 0xff, 0xff, 0,    0
-  db 0xff, 0xff, 0,    0
-  db 0xff, 0xff, 0xff, 0
-  dq 0, 0
-
-;_indexarray:
-;  db  0,  1,  2,  3
-;  db  4,  5,  6,  7
-;  db  8,  9, 10, 11
-;  db 12, 13, 14, 15
-;
-;  db 16, 17, 18, 19
-;  db 20, 21, 22, 23
-;  db 24, 25, 26, 27
-;  db 28, 29, 30, 31
-
 _one:   dq 0, 0, 0, 1
 _two:   dq 0, 0, 0, 2
 _three: dq 0, 0, 0, 3
@@ -87,23 +69,22 @@ section .text
 %define temp2 xmm3
 ; The three masks.
 %define rijndael256_mask xmm2
-%define sel1 xmm4
 %define sel2 xmm5
 %define xcn  xmm6
 
+
+; Swap bytes between the halves of the state.
+; Pseudocode:
+;   data1 = (data1 &  sel1) | (data2 &~ sel1)
+;   data2 = (data1 &~ sel1) | (data2 &  sel1)
+; Doing this as a masked merge results in a (very slightly) lower
+; timing variance. Using the register-efficient variant improves
+; throughput very slightly.
 %macro blockblend_ 0
-  ; Swap bytes between the halves of the state.
-  ; Pseudocode:
-  ;   data1 = (data1 &  sel1) | (data2 &~ sel1)
-  ;   data2 = (data1 &~ sel1) | (data2 &  sel1)
-  ; Doing this as a masked merge results in a (very slightly) lower
-  ; timing variance. (There are many equivalent ways of doing this;
-  ; not all have been tried.)
-  vpxor temp1, data1, data2   ; temp1 = data1 ^ data2
-  vpand temp2, temp1, sel1    ; temp2 = temp1 & sel1
-  vpand temp1, temp1, sel2    ; temp1 = temp1 & sel2
-  vpxor data2, data1, temp2   ; data2 = data1 ^ temp2
-  vpxor data1, data1, temp1   ; data1 = data1 ^ temp1
+  vpxor temp1, data1, data2    ; temp1 = data1 ^ data2
+  vpand temp1, temp1, sel2     ; temp1 &= mask
+  vpxor data1, data1, temp1    ; data1 ^= temp1
+  vpxor data2, data2, temp1    ; data2 ^= temp1
 
   ; Rotate column 2 of each half of the state.
   vpshufb   data2, data2, rijndael256_mask
@@ -199,7 +180,6 @@ Rijndael_k32b32_encrypt_x4:
 
   ; Load the selection and shuffle masks:
   ; (This clobbers round 0's ks1 and ks2.)
-  vmovdqa sel1, [_sel1 wrt rip]
   vmovdqa sel2, [_sel2 wrt rip]
   vmovdqa rijndael256_mask, [_rijndael256_mask wrt rip]
 
@@ -266,7 +246,6 @@ Rijndael_k32b32_encrypt_x1:
   vpxor x1, ks2, [in+16]
 
   ; Load the selection and shuffle masks. (This clobbers round 0's ks1 and ks2.)
-  vmovdqa sel1, [_sel1 wrt rip]
   vmovdqa sel2, [_sel2 wrt rip]
   vmovdqa rijndael256_mask, [_rijndael256_mask wrt rip]
 
@@ -349,7 +328,6 @@ Rijndael_k32b32_ctr:
 
     ; Load the selection and shuffle masks:
     ; (This clobbers round 0's ks1 and ks2.)
-    vmovdqa sel1, [_sel1 wrt rip]
     vmovdqa sel2, [_sel2 wrt rip]
     vmovdqa rijndael256_mask, [_rijndael256_mask wrt rip]
 

@@ -120,6 +120,7 @@ static inline int rijndael_k32b32_time(void* out) {
 int main(void) {
   uint8_t out[LEN] = {0};
   int err = rijndael_k32b32_test();
-  if (err) { return err; }
+  if (err) { printf("FAIL"); return err; }
+  printf("err=%u: OKAY\n", err);
   return rijndael_k32b32_time(out);
 }
