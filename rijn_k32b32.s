@@ -36,10 +36,10 @@ _sel2:
   db 0,    0,    0, 0xff
   dq 0, 0
 
-_one:   dq 0, 0, 0, 1
-_two:   dq 0, 0, 0, 2
-_three: dq 0, 0, 0, 3
-_four:  dq 0, 0, 0, 4
+_one:   dq 0, 1
+_two:   dq 0, 2
+_three: dq 0, 3
+_four:  dq 0, 4
 
 %define one [rel _one]
 %define two [rel _two]
@@ -75,11 +75,11 @@ section .text
 
 ; Swap bytes between the halves of the state.
 ; Pseudocode:
-;   data1 = (data1 &  sel1) | (data2 &~ sel1)
-;   data2 = (data1 &~ sel1) | (data2 &  sel1)
+;   sel1  = ~sel2
+;   data1 = (data1 &  sel1) | (data2 &  sel2)
+;   data2 = (data1 &  sel2) | (data2 &  sel1)
 ; Doing this as a masked merge results in a (very slightly) lower
-; timing variance. Using the register-efficient variant improves
-; throughput very slightly.
+; timing variance. Using the in-place variant improves throughput.
 %macro blockblend_ 0
   vpxor temp1, data1, data2    ; temp1 = data1 ^ data2
   vpand temp1, temp1, sel2     ; temp1 &= mask
@@ -124,6 +124,7 @@ section .text
   movdqu [out+outo+16], data2
   movdqu [out+outo], data1
 %endmacro
+
 
 ; Do 4 independent rouds of Rijndael256.
 %macro _k32b32_roundx4 1
@@ -268,6 +269,26 @@ Rijndael_k32b32_encrypt_x1:
   ret
 
 
+; Macro to do the last round of Rijndael256.
+%macro k32b32_lastxor 3
+  %define outo (%1*32)
+  %define data1 %2
+  %define data2 %3
+  %define kso (14 * 32)
+
+
+  blockblend
+
+  vaesenclast data2, data2, [r10+kso+16]
+  vaesenclast data1, data1, [r10+kso]
+
+  vpxor data2, data2, [out+outo+16]
+  vpxor data1, data1, [out+outo+16]
+  vmovdqu [out+outo+16], data2
+  vmovdqu [out+outo], data1
+%endmacro
+
+
 ; Rijndael_k32b32_encrypt_ctr(
 ;     void* restrict ks,    // rdi
 ;     void* dst,            // rsi
@@ -342,11 +363,11 @@ Rijndael_k32b32_ctr:
       cmp r8, 14         ; if (i != 14)     ; And repeat, until we've gotten
       jne ._rounds       ;   goto ._rounds  ; to the 14th round.
 
-    ; Do round 14, and store the encrypted blocks.
-    k32b32_lastx  0, x0, x1
-    k32b32_lastx  1, x2, x3
-    k32b32_lastx  2, x4, x5
-    k32b32_lastx  3, x6, x7
+    ; Do round 14, and xor out the keystream.
+    k32b32_lastxor  0, x0, x1
+    k32b32_lastxor  1, x2, x3
+    k32b32_lastxor  2, x4, x5
+    k32b32_lastxor  3, x6, x7
 
   add out, 32*4
   add in,  32*4

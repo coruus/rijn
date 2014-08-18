@@ -149,3 +149,34 @@ Rijndael_k32b32_expandkey:
 
   vzeroall
   ret 
+
+
+; Expand a 32-byte key to a 256-byte key schedule.
+align 32
+global Rijndael_k32_ks256
+Rijndael_k32_ks256:
+  vzeroall
+
+  loadk32
+
+  vmovdqa shuffle_mask, [_Rijndael_k32_shuffle_mask wrt rip]
+
+  k32_expand 0x01
+  k32_expand 0x02
+  k32_expand 0x04
+  k32_expand 0x08
+  k32_expand 0x10
+  k32_expand 0x20
+  k32_expand 0x40
+  k32_expand 0x80
+  k32_expand 0x1b
+  k32_expand 0x36
+  k32_expand 0x6c
+  k32_expand 0xd8
+  k32_expand 0xab
+  k32_expand 0x4d
+  k32_expand 0x9a ; todo verify
+;  k32_expand 0x2f ; todo verify
+
+  vzeroall
+  ret
