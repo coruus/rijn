@@ -54,23 +54,23 @@ eight: dq 0, 0, 0, 8
 section .text
 
 ; Registers used for the encryption state.
-%define x0 xmm7
-%define x1 xmm8
-%define x2 xmm9
-%define x3 xmm10
-%define x4 xmm11
-%define x5 xmm12
-%define x6 xmm13
-%define x7 xmm14
-%define x8 xmm15
+%define x0 xmm4
+%define x1 xmm5
+%define x2 xmm6
+%define x3 xmm7
+%define x4 xmm8
+%define x5 xmm9
+%define x6 xmm10
+%define x7 xmm11
+%define x8 xmm12
 
 ; The two temporary registers needed for bitops
-%define temp1 xmm1
-%define temp2 xmm3
+%define temp1 xmm0
+%define temp2 xmm1
 ; The three masks.
 %define rijndael256_mask xmm2
-%define sel2 xmm5
-%define xcn  xmm6
+%define sel2 xmm3
+%define xcn  xmm2
 
 
 ; Swap bytes between the halves of the state.
@@ -233,8 +233,8 @@ Rijndael_k32b32_encrypt_x1:
   mov r11, out
   mov rcx, 32*4
 
-  %define ks1 xmm1
-  %define ks2 xmm0
+  %define ks1 temp1
+  %define ks2 temp2
 
   ; Load ks[0:8]
   vmovdqu ks1, [ks]        ; ks1 = ks[0:4]
@@ -283,13 +283,17 @@ Rijndael_k32b32_encrypt_x1:
   vaesenclast data1, data1, [r10+kso]
 
   vpxor data2, data2, [out+outo+16]
-  vpxor data1, data1, [out+outo+16]
+  vpxor data1, data1, [out+outo+0 ]
   vmovdqu [out+outo+16], data2
   vmovdqu [out+outo], data1
 %endmacro
 
 
-; Rijndael_k32b32_encrypt_ctr(
+
+%define rijndael256_mask [_rijndael256_mask wrt rip];xmm2
+%define sel2 [rel _sel2] ;xmm3
+
+; Rijndael_k32b32_ctr(
 ;     void* restrict ks,    // rdi
 ;     void* dst,            // rsi
 ;     void* nc,             // rdx
@@ -325,18 +329,21 @@ Rijndael_k32b32_ctr:
 
     ; Load the nonce block.
     vmovdqu x0, [nc+0 ]       ; x0 = { n[0], n[1] }
-    vpxor   x0, x0, ks1       ; x0 ^= ks1
-    vmovdqa x2, x0            ; x2 =  x0
-    vmovdqa x4, x0            ; x4 =  x0
-    vmovdqa x6, x0            ; x6 =  x0
-
     ; Load the nonce+c block.
     vmovdqu xcn, [nc+16]      ; xcn = { n[2], c    }
-    ; Setup the counters for this block.
+
+    ; Xor in the round key
+    vpxor   x0, x0, ks1       ; x0 ^= ks1
+    
     vmovdqa x1, xcn           ; x1  = { n[2], c    }
     vpaddq  x3, xcn, one      ; x3  = { n[2], c+1  }
     vpaddq  x5, xcn, two      ; x5  = { n[2], c+2  }
     vpaddq  x7, xcn, three    ; x7  = { n[2], c+3  }
+
+    vmovdqa x2, x0            ; x2 =  x0
+    vmovdqa x4, x0            ; x4 =  x0
+    vmovdqa x6, x0            ; x6 =  x0
+
     ; Xor in ks2
     vpxor  x1, x1, ks2        ; x1 ^= ks2
     vpxor  x3, x3, ks2        ; x3 ^= ks2
@@ -349,8 +356,8 @@ Rijndael_k32b32_ctr:
 
     ; Load the selection and shuffle masks:
     ; (This clobbers round 0's ks1 and ks2.)
-    vmovdqa sel2, [_sel2 wrt rip]
-    vmovdqa rijndael256_mask, [_rijndael256_mask wrt rip]
+    ;vmovdqa sel2, [_sel2 wrt rip]
+    ;vmovdqa rijndael256_mask, [_rijndael256_mask wrt rip]
 
     ; Loop to do rounds 1-13.
     mov r8, 1            ; r_i = 1
