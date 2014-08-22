@@ -10,6 +10,8 @@ cflags = -D__STDC_WANT_LIB_EXT1__=1 -I. -Wextra -std=c11 -O3 $carch
 
 rule asm
   command = yasm $asm_arch $in -o $out
+rule cas 
+  command = clang -c $in -o $out
 rule static
   command = libtool -static -o $out $in
 rule cexec
@@ -18,11 +20,13 @@ rule cexec
 #rule ginger
 #  command = ./scripts/ginger.py $in > $out
 
+build $b/moon.o: cas chacha.S
 build $b/rijn_k32b32.o: asm rijn_k32b32.s
 build $b/rijn_k32b16.o: asm rijn_k32b16.s
 build $b/rijn_k32ks.o:  asm rijn_k32ks.s
+build $b/rijn_ctr.o:    cas rijn_k32b32.gnu.S
 
-build $b/rijn.a: static $b/rijn_k32ks.o $b/rijn_k32b32.o $b/rijn_k32b16.o
+build $b/rijn.a: static $b/rijn_ctr.o $b/rijn_k32ks.o $b/rijn_k32b32.o $b/rijn_k32b16.o $b/moon.o
 
 build $b/test: cexec rijn-api.c $b/rijn.a
 build $b/time: cexec test_k32b32.c $b/rijn.a
