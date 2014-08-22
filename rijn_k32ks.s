@@ -4,10 +4,12 @@
 ;              and Intel's AES-NI library.
 ; Extended by: David Leon Gil (32B blocksize)
 ; 
-; License: CC0
-; 
+; License: CC0, attribution kindly requested.
+;
+; An up-to-date version will be maintained at:
+;   https://github.com/coruus/rijn
+;
 ; TODO: Is it possible to do this faster on Haswell?
-; (Likely yes, at least for expanding at least 8 keys at the same time.)
 ; 
 [cpu intelnop]
 [bits 64]
@@ -16,10 +18,6 @@ section .data
 align 32
 
 _Rijndael_k32_shuffle_mask:
-;  dd 0ffffffffh
-;  dd 03020100h
-;  dd 07060504h
-;  dd 0B0A0908h
   db 0xff, 0xff, 0xff, 0xff  ; Set the first word to zeros.
   db 0x0, 0x1, 0x2, 0x3      ; And shift left by 32 bits.
   db 0x4, 0x5, 0x6, 0x7

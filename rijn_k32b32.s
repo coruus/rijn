@@ -7,13 +7,18 @@
 ; License: CC0, attribution kindly requested.
 ;
 ; An up-to-date version will be maintained at:
-;   https://github.com/coruus/rijndael-aesni
+;   https://github.com/coruus/rijn
 ;
 ; Notes:
 ;   No secret data ever flows into a GPR; but memory locations
 ;   of secret data are not cleaned from GPRs. If this is a
 ;   concern, you should modify this code to zeroize those
 ;   registers.
+;
+;   (Note: The counter in CTR mode is treated as secret.)
+;
+; TODO: Can do this faster on Haswell, I think, for very long
+; messages.
 ;
 [CPU intelnop]
 [bits 64]
@@ -22,7 +27,7 @@ section .data
 
 align 32
 
-_rijndael256_mask:
+_Rijndael_b32_shuffle_mask:
   db 0x0, 0x1, 0x6, 0x7
   db 0x4, 0x5, 0xa, 0xb
   db 0x8, 0x9, 0xe, 0xf
@@ -45,11 +50,6 @@ _four:  dq 0, 4
 %define two [rel _two]
 %define three [rel _three]
 %define four [rel _four]
-
-five:  dq 0, 0, 0, 5
-six:   dq 0, 0, 0, 6
-seven: dq 0, 0, 0, 7
-eight: dq 0, 0, 0, 8
 
 section .text
 
@@ -182,7 +182,7 @@ Rijndael_k32b32_encrypt_x4:
   ; Load the selection and shuffle masks:
   ; (This clobbers round 0's ks1 and ks2.)
   vmovdqa sel2, [_sel2 wrt rip]
-  vmovdqa rijndael256_mask, [_rijndael256_mask wrt rip]
+  vmovdqa rijndael256_mask, [_Rijndael_b32_shuffle_mask wrt rip]
 
   ; Loop to do rounds 1-13.
   mov r8, 1            ; r_i = 1
@@ -248,7 +248,7 @@ Rijndael_k32b32_encrypt_x1:
 
   ; Load the selection and shuffle masks. (This clobbers round 0's ks1 and ks2.)
   vmovdqa sel2, [_sel2 wrt rip]
-  vmovdqa rijndael256_mask, [_rijndael256_mask wrt rip]
+  vmovdqa rijndael256_mask, [_Rijndael_b32_shuffle_mask wrt rip]
 
   ; Loop to do rounds 1-13.
   mov r8, 1            ; r_i = 1
@@ -289,8 +289,23 @@ Rijndael_k32b32_encrypt_x1:
 %endmacro
 
 
+; Reassign registers for CTR mode
+%define x0 xmm2
+%define x1 xmm3
+%define x2 xmm4
+%define x3 xmm5
+%define x4 xmm6
+%define x5 xmm7
+%define x6 xmm8
+%define x7 xmm9
+%define x8 xmm10
 
-%define rijndael256_mask [_rijndael256_mask wrt rip];xmm2
+%define temp1 xmm0
+%define temp2 xmm1
+; The nonce+counter
+%define xcn  xmm11
+
+%define rijndael256_mask [_Rijndael_b32_shuffle_mask wrt rip];xmm2
 %define sel2 [rel _sel2] ;xmm3
 
 ; Rijndael_k32b32_ctr(
@@ -299,89 +314,90 @@ Rijndael_k32b32_encrypt_x1:
 ;     void* nc,             // rdx
 ;     uint64_t nblocks      // rcx
 ; ): Xor the output with nblocks*128 bytes of output.
-align 32
-global Rijndael_k32b32_ctr
-Rijndael_k32b32_ctr:
-  %define arg1 rdi
-  %define arg2 rsi
-  %define arg3 rdx
-  %define arg4 rcx
-  %define arg5 r8
-  
-  %define ks  arg1
-  %define out arg2  
-  %define nc arg3
-  %define nblocks arg4
-  ; Zero all vector-unit registers.
-  vzeroall
-
-  mov r10, ks
-  mov r11, out
-
-  %define ks1 xmm1
-  %define ks2 xmm0
-
-  align 16
-  ._start:
-    ; Load ks[0:8]
-    vmovdqu ks1, [ks]        ; ks1 = ks[0:4]
-    vmovdqu ks2, [ks+16]     ; ks2 = ks[4:8]
-
-    ; Load the nonce block.
-    vmovdqu x0, [nc+0 ]       ; x0 = { n[0], n[1] }
-    ; Load the nonce+c block.
-    vmovdqu xcn, [nc+16]      ; xcn = { n[2], c    }
-
-    ; Xor in the round key
-    vpxor   x0, x0, ks1       ; x0 ^= ks1
-    
-    vmovdqa x1, xcn           ; x1  = { n[2], c    }
-    vpaddq  x3, xcn, one      ; x3  = { n[2], c+1  }
-    vpaddq  x5, xcn, two      ; x5  = { n[2], c+2  }
-    vpaddq  x7, xcn, three    ; x7  = { n[2], c+3  }
-
-    vmovdqa x2, x0            ; x2 =  x0
-    vmovdqa x4, x0            ; x4 =  x0
-    vmovdqa x6, x0            ; x6 =  x0
-
-    ; Xor in ks2
-    vpxor  x1, x1, ks2        ; x1 ^= ks2
-    vpxor  x3, x3, ks2        ; x3 ^= ks2
-    vpxor  x5, x5, ks2        ; x5 ^= ks2
-    vpxor  x7, x7, ks2        ; x7 ^= ks2
-
-    ; Save the next zero state of the counter.
-    vpaddq  xcn, xcn, four    ; xcn = { n[2], c+4 }
-    vmovdqu [nc+16], xcn      ; { n[2], c } = xcn
-
-    ; Load the selection and shuffle masks:
-    ; (This clobbers round 0's ks1 and ks2.)
-    ;vmovdqa sel2, [_sel2 wrt rip]
-    ;vmovdqa rijndael256_mask, [_rijndael256_mask wrt rip]
-
-    ; Loop to do rounds 1-13.
-    mov r8, 1            ; r_i = 1
-    mov ks, r10          ; ks_i = ks_start
-    align 16
-    ._rounds:
-      add ks, 32         ; ks_i += 32       ; Advance scheduled keys.
-      _k32b32_roundx4 0  ;                  ; Do the round.
-      inc r8             ; i += 1           ; Increment the round counter.
-      cmp r8, 14         ; if (i != 14)     ; And repeat, until we've gotten
-      jne ._rounds       ;   goto ._rounds  ; to the 14th round.
-
-    ; Do round 14, and xor out the keystream.
-    k32b32_lastxor  0, x0, x1
-    k32b32_lastxor  1, x2, x3
-    k32b32_lastxor  2, x4, x5
-    k32b32_lastxor  3, x6, x7
-
-  add out, 32*4
-  add in,  32*4
-  sub nblocks, 1
-  jnz ._start
-
-  ; Zero all registers.
-  vzeroall
-
-  ret
+;align 32
+;global Rijndael_k32b32_ctr
+;Rijndael_k32b32_ctr:
+;  %define arg1 rdi
+;  %define arg2 rsi
+;  %define arg3 rdx
+;  %define arg4 rcx
+;  %define arg5 r8
+;  
+;  %define ks  arg1
+;  %define out arg2
+;  %define in arg3
+;  %define nc arg4
+;  %define nblocks arg5
+;  ; Zero all vector-unit registers.
+;  vzeroall
+;
+;  mov r10, ks                ; ks_start
+;  mov r11, out
+;
+;  %define ks1 xmm1
+;  %define ks2 xmm0
+;
+;  align 16
+;  ._start:
+;    mov ks, r10              ; ks_i = ks_start
+;    ; Load ks[0:8]
+;    vmovdqu ks1, [ks]        ; ks1 = ks[0:4]
+;    vmovdqu ks2, [ks+16]     ; ks2 = ks[4:8]
+;
+;    ; Load the nonce block.
+;    vmovdqu x0, [nc+0 ]       ; x0 = { n[0], n[1] }
+;    ; Load the nonce+c block.
+;    vmovdqu xcn, [nc+16]      ; xcn = { n[2], c    }
+;
+;    ; Xor in the round key
+;    vpxor   x0, x0, ks1       ; x0 ^= ks1
+;    
+;    vmovdqa x1, xcn           ; x1  = { n[2], c    }
+;    vpaddq  x3, xcn, one      ; x3  = { n[2], c+1  }
+;    vpaddq  x5, xcn, two      ; x5  = { n[2], c+2  }
+;    vpaddq  x7, xcn, three    ; x7  = { n[2], c+3  }
+;
+;    vmovdqa x2, x0            ; x2 =  x0
+;    vmovdqa x4, x0            ; x4 =  x0
+;    vmovdqa x6, x0            ; x6 =  x0
+;
+;    ; Xor in ks2
+;    vpxor  x1, x1, ks2        ; x1 ^= ks2
+;    vpxor  x3, x3, ks2        ; x3 ^= ks2
+;    vpxor  x5, x5, ks2        ; x5 ^= ks2
+;    vpxor  x7, x7, ks2        ; x7 ^= ks2
+;
+;    ; Save the next zero state of the counter.
+;    vpaddq  xcn, xcn, four    ; xcn = { n[2], c+4 }
+;    vmovdqu [nc+16], xcn      ; { n[2], c } = xcn
+;
+;    ; Load the selection and shuffle masks:
+;    ; (This clobbers round 0's ks1 and ks2.)
+;    ;vmovdqa sel2, [_sel2 wrt rip]
+;    ;vmovdqa rijndael256_mask, [_Rijndael_b32_shuffle_mask wrt rip]
+;
+;    ; Loop to do rounds 1-13.
+;    mov r9, 1            ; r_i = 1
+;    align 16
+;    ._rounds:
+;      add ks, 32         ; ks_i += 32       ; Advance scheduled keys.
+;      _k32b32_roundx4 0  ;                  ; Do the round.
+;      inc r9             ; i += 1           ; Increment the round counter.
+;      cmp r9, 14         ; if (i != 14)     ; And repeat, until we've gotten
+;      jne ._rounds       ;   goto ._rounds  ; to the 14th round.
+;
+;    ; Do round 14, and xor out the keystream.
+;    k32b32_lastxor  0, x0, x1
+;    k32b32_lastxor  1, x2, x3
+;    k32b32_lastxor  2, x4, x5
+;    k32b32_lastxor  3, x6, x7
+;
+;  add in, 32*4
+;  add out, 32*4
+;  sub nblocks, 1
+;  jnz ._start
+;
+;  ; Zero all registers.
+;  vzeroall
+;
+;  ret

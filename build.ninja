@@ -15,7 +15,7 @@ rule cas
 rule static
   command = libtool -static -o $out $in
 rule cexec
-  command = clang $cflags -o $out $in
+  command = clang $cflags -o $out $in -fsanitize=address
 
 #rule ginger
 #  command = ./scripts/ginger.py $in > $out
@@ -25,8 +25,9 @@ build $b/rijn_k32b32.o: asm rijn_k32b32.s
 build $b/rijn_k32b16.o: asm rijn_k32b16.s
 build $b/rijn_k32ks.o:  asm rijn_k32ks.s
 build $b/rijn_ctr.o:    cas rijn_k32b32.gnu.S
+build $b/rijn_ctrks.o:  cas rijn_k32ks.gnu.S
 
-build $b/rijn.a: static $b/rijn_ctr.o $b/rijn_k32ks.o $b/rijn_k32b32.o $b/rijn_k32b16.o $b/moon.o
+build $b/rijn.a: static $b/rijn_ctrks.o $b/rijn_ctr.o  $b/rijn_k32ks.o $b/rijn_k32b32.o $b/rijn_k32b16.o $b/moon.o
 
 build $b/test: cexec rijn-api.c $b/rijn.a
 build $b/time: cexec test_k32b32.c $b/rijn.a

@@ -15,5 +15,5 @@ extern void Rijndael_k32b16_encrypt_x8(
 
 // Low-level encryption functions for CTR mode.
 extern void Rijndael_k32b32_encrypt_ctr(
-    void* restrict ks, void* dst, const void* nc, uint64_t nblocks);
+    void* restrict ks, void* dst, const void* src, void* nc, uint64_t nblocks);
 #endif

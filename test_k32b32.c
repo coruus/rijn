@@ -50,20 +50,25 @@ int rijndael_k32b32_ctr_test(void) {
   uint32_t ks[240] = {0};
   uint8_t k[32] = {1};
   Rijndael_k32b32_expandkey(ks, k);
-  uint64_t blocks[4][4] = { { 1, 2, 3, 0 },
+  uint64_t blocks[8][4] = { { 1, 2, 3, 0 },
                             { 1, 2, 3, 1 },
                             { 1, 2, 3, 2 },
-                            { 1, 2, 3, 3 } };
-  uint8_t enc_ecb[128] = { 0 };
-  uint8_t enc_ctr[128] = { 0 };
-  memset_s(enc_ctr, 128, 0, 128);
+                            { 1, 2, 3, 3 },
+                            { 1, 2, 3, 4 },
+                            { 1, 2, 3, 5 },
+                            { 1, 2, 3, 6 },
+                            { 1, 2, 3, 7 } };
+  uint8_t enc_ecb[256] = { 0 };
+  uint8_t enc_ctr[256] = { 0 };
   uint64_t nc[4] = { 1, 2, 3, 0 };
   Rijndael_k32b32_encrypt_x4(ks, enc_ecb, blocks);
-  Rijndael_k32b32_ctr(ks, enc_ctr, nc, 1);
-  printbuf(enc_ecb, 128);
-  printbuf(enc_ctr, 128);
+  Rijndael_k32b32_encrypt_x4(ks, enc_ecb + 128, &blocks[4]);
+  memset_s(enc_ctr, 256, 0, 256);
+  Rijndael_k32b32_ctr(ks, enc_ctr, enc_ctr, nc, 2);
+  printbuf(enc_ecb, 256);
+  printbuf(enc_ctr, 256);
   printbuf(nc, 4*8);
-  if (memcmp(enc_ecb, enc_ctr, 128) != 0) {
+  if (memcmp(enc_ecb, enc_ctr, 256) != 0) {
     printf("FAIL\n");
     return -1;
   } else {
@@ -82,11 +87,27 @@ double rijndael_k32b32_ctr_time(void* ks, void* out, size_t len) {
   
   uint64_t start = cycles();
   for (size_t i = 0; i < n; i++) {
-    Rijndael_k32b32_ctr(ks, out, nc, len/128);
+    Rijndael_k32b32_ctr(ks, out, out, nc, len/128);
   }
   double cpb = cycles() - start;
   cpb /= (n * len);
   printf("k32b32_ctr %4f cpb\n", cpb);
+  return cpb;
+}
+
+extern void chacha_avx2(const unsigned char *k, const unsigned char *n, const unsigned char *in, unsigned char *out, size_t inlen, size_t rounds);
+
+double chacha_time(void* ks, void* out, size_t len) {
+  size_t n = ((((size_t)1) << EXP) / len);
+  uint64_t nc[2] = {0, 0};
+  
+  uint64_t start = cycles();
+  for (size_t i = 0; i < n; i++) {
+    chacha_avx2(ks, nc, out, out, len, 20);
+  }
+  double cpb = cycles() - start;
+  cpb /= (n * len);
+  printf("chacha20_ctr %4f cpb\n", cpb);
   return cpb;
 }
 
@@ -153,6 +174,10 @@ static inline int rijndael_k32b32_time(void* out) {
   memcpy(in, rijndael_k32b32_test0_plaintext, 8224);
 
   rijndael_k32b32_ctr_time(ks, out, 8192);
+  chacha_time(ks, out, 8192);
+  rijndael_k32b32_ctr_time(ks, out, 8192);
+  chacha_time(ks, out, 8192);
+
   size_t sizes[4] = { 128, 1350, 4096, 8192 };
   for (int i = 0; i < 4; i++) {
     double cpb32 = rijndael_k32b32_timelen(ks, out, in, sizes[i]);
