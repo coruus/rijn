@@ -1,7 +1,7 @@
 /*
  * Rijndael with 256-bit blocksize and 256-bit keylength.
  *
- * Translated from the original YASM by otool.
+ * (Translated from the original YASM by LLVM-MC.)
  *
  * Implementor: David Leon Gil
  * Inspired by:
@@ -14,11 +14,9 @@
  *
  * Notes:
  *   No secret data ever flows into a GPR; but memory locations
- *   of secret data are not cleaned from GPRs. If this is a
- *   concern, you should modify this code to zeroize those
- *   registers.
+ *   of secret data are not cleaned from GPRs.
  *
- *   (Note: The counter in CTR mode is treated as secret.)
+ *   (Note: The counter is treated as secret.)
 */
 .data
 
