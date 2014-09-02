@@ -95,22 +95,6 @@ double rijndael_k32b32_ctr_time(void* ks, void* out, size_t len) {
   return cpb;
 }
 
-extern void chacha_avx2(const unsigned char *k, const unsigned char *n, const unsigned char *in, unsigned char *out, size_t inlen, size_t rounds);
-
-double chacha_time(void* ks, void* out, size_t len) {
-  size_t n = ((((size_t)1) << EXP) / len);
-  uint64_t nc[2] = {0, 0};
-  
-  uint64_t start = cycles();
-  for (size_t i = 0; i < n; i++) {
-    chacha_avx2(ks, nc, out, out, len, 20);
-  }
-  double cpb = cycles() - start;
-  cpb /= (n * len);
-  printf("chacha20_ctr %4f cpb\n", cpb);
-  return cpb;
-}
-
 double rijndael_k32b16_timelen(void* ks, void* out, void* in, size_t len) {
   size_t n = ((((size_t)1) << EXP) / len);
   uint64_t then = time_now();
@@ -174,9 +158,7 @@ static inline int rijndael_k32b32_time(void* out) {
   memcpy(in, rijndael_k32b32_test0_plaintext, 8224);
 
   rijndael_k32b32_ctr_time(ks, out, 8192);
-  chacha_time(ks, out, 8192);
   rijndael_k32b32_ctr_time(ks, out, 8192);
-  chacha_time(ks, out, 8192);
 
   size_t sizes[4] = { 128, 1350, 4096, 8192 };
   for (int i = 0; i < 4; i++) {
