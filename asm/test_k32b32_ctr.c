@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "test_k32b32_ecb_k0.const"
+#include "test/test_k32b32_ecb_k0.const"
 
 #define LEN 8224
 #define popcnt __builtin_popcount

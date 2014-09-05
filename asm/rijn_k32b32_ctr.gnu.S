@@ -70,6 +70,7 @@ Rijndael_k32b32_ctr._start:
 	vpaddq	__four(%rip), %xmm11, %xmm11
 	vmovdqu	%xmm11, 0x10(%rcx)
 	movq	$0x1, %r9
+
 .align 4
 Rijndael_k32b32_ctr._rounds:
 	addq	$0x20, %rdi
@@ -79,13 +80,14 @@ Rijndael_k32b32_ctr._rounds:
 	vpxor	%xmm0, %xmm3, %xmm3
 	vpshufb	__shuf(%rip), %xmm3, %xmm3
 	vpshufb	__shuf(%rip), %xmm2, %xmm2
-	vaesenc	0x10(%rdi), %xmm3, %xmm3
-	vaesenc	0x00(%rdi), %xmm2, %xmm2
 	vpxor	%xmm5, %xmm4, %xmm0
 	vpand	__mask(%rip), %xmm0, %xmm0
 	vpxor	%xmm0, %xmm4, %xmm4
 	vpxor	%xmm0, %xmm5, %xmm5
-	vpshufb	__shuf(%rip), %xmm5, %xmm5
+	vaesenc	0x10(%rdi), %xmm3, %xmm3
+	vaesenc	0x00(%rdi), %xmm2, %xmm2
+
+vpshufb	__shuf(%rip), %xmm5, %xmm5
 	vpshufb	__shuf(%rip), %xmm4, %xmm4
 	vaesenc	0x10(%rdi), %xmm5, %xmm5
 	vaesenc	0x00(%rdi), %xmm4, %xmm4
@@ -107,7 +109,9 @@ Rijndael_k32b32_ctr._rounds:
 	vaesenc	0x00(%rdi), %xmm8, %xmm8
 	incq	%r9
 	cmpq	$0xe, %r9
+	
 	jne	Rijndael_k32b32_ctr._rounds
+
 	vpxor	%xmm3, %xmm2, %xmm0
 	vpand	__mask(%rip), %xmm0, %xmm0
 	vpxor	%xmm0, %xmm2, %xmm2
@@ -159,6 +163,7 @@ Rijndael_k32b32_ctr._rounds:
 	addq	$0x80, %rdx
 	addq	$0x80, %rsi
 	subq	$0x1, %r8
+
 	jne	Rijndael_k32b32_ctr._start
 	vzeroall
 	retq
