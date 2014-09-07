@@ -35,16 +35,53 @@ int rijndael_k32b32_test(void) {
   for (size_t i = 0; i < LEN; i += 128) {
       Rijndael_k32b32_encrypt_x4(ks, obuf + i, ibuf + i);
   }
-  if (memcmp(obuf, rijndael_k32b32_test0_ciphertext, rijndael_k32b32_test0_len) != 0) {
     printbuf(obuf, 128);
     printbuf(rijndael_k32b32_test0_ciphertext, 128);
+  if (memcmp(obuf, rijndael_k32b32_test0_ciphertext, rijndael_k32b32_test0_len) != 0) {
+
     exit(0);
-    printf("FAIL");
+    printf("FAIL\n");
     return -1;
   } else {
+    printf("OKAY\n");
     return 0;
   }
 }
+
+static const uint8_t k32[32] = { 0x01, 0x11, 0x02, 0x22, 0x03, 0x33, 0x04, 0x44,
+                                 0x55, 0x05, 0x66, 0x06, 0x77, 0x07, 0x88, 0x08,
+                                 0x09, 0x99, 0x0a, 0xaa, 0x0b, 0xbb, 0x0c, 0xcc,
+                                 0xdd, 0x0d, 0xee, 0x0e, 0xff, 0x0f, 0xf1, 0x1f };
+
+
+int test_rijndael_k32b32_ctr(void) {
+  uint64_t nc[4][4] = { {0, 0, 0, 0},
+                        {0, 0, 0, 1},
+                        {0, 0, 0, 2},
+                        {0, 0, 0, 3} };
+  uint32_t ks[120] = {0};
+  Rijndael_k32b32_expandkey(ks, k32);
+
+  uint8_t ctrin[4*4*4*8] = {0};
+  uint8_t ctrout[4*4*4*8] = {0};
+  uint64_t nc0[4] = {0, 0, 0, 0};
+//  Rijndael_k32b32_ctr(ks, ctrout, ctrin, nc);
+  printbuf(ctrout, 4*4*4*8);
+  for (uint64_t i = 0; i < 16; i += 4) {
+    nc[0][3] = i;
+    nc[1][3] = i + 1;
+    nc[2][3] = i + 2;
+    nc[3][3] = i + 3;
+    uint8_t in[4*4*8];
+    memcpy(in, nc, 4*4*8);
+    Rijndael_k32b32_encrypt_x4(ks, ctrout + (i * 32), in);
+  }
+  printbuf(ctrout, 4*4*4*8);
+
+  return 0;
+}
+
+
 
 #define cycles __builtin_readcyclecounter
 #define EXP 33
@@ -121,5 +158,7 @@ int main(void) {
   uint8_t out[LEN] = {0};
   int err = rijndael_k32b32_test();
   if (err) { return err; }
-  return rijndael_k32b32_time(out);
+  test_rijndael_k32b32_ctr();
+  return 0;
+  //return rijndael_k32b32_time(out);
 }

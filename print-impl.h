@@ -30,7 +30,7 @@ static inline void _printbuf(const void* const buf, register const size_t buflen
   register const uint8_t* const bytes = (uint8_t*)buf;
   for (size_t i = 0; i < buflen; i++) {
     ifnotmod(i, 16, printf(" "));
-    ifnotmod(i, 16 * 4, printf("\n"));
+    ifnotmod(i, 32 * 4, printf("\n"));
     printf("%02x", bytes[i]);
   }
   printf("\n");

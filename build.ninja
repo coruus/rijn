@@ -6,7 +6,8 @@ asm_lin = ${asm_nix} --oformat=elf64
 asm_arch = ${asm_osx}
 carch = -mavx2 -mbmi2 -march=native
 #carch = -march=native
-cflags = -D__STDC_WANT_LIB_EXT1__=1 -I. -Wextra -std=c11 -O3 $carch
+csan = -fsanitize=address -fsanitize=undefined
+cflags = -D__STDC_WANT_LIB_EXT1__=1 -I. -Wextra -std=c11 -O3 $carch $csan
 
 rule asm
   command = yasm $asm_arch $in -o $out
