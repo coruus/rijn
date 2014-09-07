@@ -23,13 +23,13 @@ int main(int argc, char** argv) {
   if (argc > 1) {
     uint64_t start = cycles();
     for (uint64_t i = 0; i < N; i++) {
-      rijndael256_ctr(out, in, M, k32, n);
+      rijndael256_ctr_xor(out, in, M, n, k32);
     }
     double cpb = cycles() - start;
     cpb /= (M * N);
     fprintf(stderr, "cpb=%f\n", cpb);
   } else {
-    rijndael256_ctr(out, in, M, k32, n);
+    rijndael256_ctr_xor(out, in, M, n, k32);
     _printbuf(out, M);
   }
   return 0;
