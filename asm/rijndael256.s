@@ -22,8 +22,9 @@ _Rijndael_b32_blend_mask:
 %macro blockblend 0
   vpxor temp1, data1, data2    ; temp1 = data1 ^ data2
   vpand temp1, temp1, sel2     ; temp1 &= mask
+  vpandn temp3, sel2, temp2    ; temp2 &= ~mask
   vpxor data1, data1, temp1    ; data1 ^= temp1
-  vpxor data2, data2, temp1    ; data2 ^= temp1
+  vpxor data2, data2, temp3    ; data2 ^= temp1
 
   ; Rotate column 2 of each half of the state.
   vpshufb   data2, data2, rijndael256_mask
@@ -35,6 +36,7 @@ _Rijndael_b32_blend_mask:
 %define data2 xmm5
 %define temp1 xmm6
 %define temp2 xmm7
+%define temp3 xmm8
 
 align 32
 section .text

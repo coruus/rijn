@@ -80,7 +80,7 @@ section .text
 ;   data2 = (data1 &  sel2) | (data2 &  sel1)
 ; Doing this as a masked merge results in a (very slightly) lower
 ; timing variance. Using the in-place variant improves throughput.
-%macro blockblend_ 0
+%macro blockblend 0
   vpxor temp1, data1, data2    ; temp1 = data1 ^ data2
   vpand temp1, temp1, sel2     ; temp1 &= mask
   vpxor data1, data1, temp1    ; data1 ^= temp1
@@ -90,11 +90,6 @@ section .text
   vpshufb   data2, data2, rijndael256_mask
   vpshufb   data1, data1, rijndael256_mask
 %endmacro
-
-%macro blockblend_off 0
-%endmacro
-
-%define blockblend blockblend_
 
 ; Do a single round; parameter 1 is the offset into the
 ; key schedule. It should be 0 unless this macro is used
@@ -167,15 +162,16 @@ Rijndael_k32b32_encrypt_x4:
   ; Round 0, xor with key:
   ;   x[0:4] ^= ks[0:4]
   ;   x[4:8] ^= ks[4:8]
-  vpxor x0, ks1, [in+0]
-  vpxor x1, ks2, [in+16]
-  vpxor x2, ks1, [in+32]
-  vpxor x3, ks2, [in+48]
-  vpxor x4, ks1, [in+64]
-  vpxor x5, ks2, [in+80]
-  vpxor x6, ks1, [in+96]
+  vpxor x0, ks1, [in+0  ]
+  vpxor x1, ks2, [in+16 ]
+  vpxor x2, ks1, [in+32 ]
+  vpxor x3, ks2, [in+48 ]
+  vpxor x4, ks1, [in+64 ]
+  vpxor x5, ks2, [in+80 ]
+  vpxor x6, ks1, [in+96 ]
   vpxor x7, ks2, [in+112]
 
+  blockblend
   ; Load the selection and shuffle masks:
   ; (This clobbers round 0's ks1 and ks2.)
   ;vmovdqa sel2, [_sel2 wrt rip]
