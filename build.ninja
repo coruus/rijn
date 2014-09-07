@@ -6,7 +6,7 @@ asm_lin = ${asm_nix} --oformat=elf64
 asm_arch = ${asm_osx}
 carch = -mavx2 -mbmi2 -march=native
 #carch = -march=native
-csan = -fsanitize=address -fsanitize=undefined
+csan = -fsanitize=address -fsanitize=undefined -fcolor-diagnostics
 cflags = -D__STDC_WANT_LIB_EXT1__=1 -I. -Wextra -std=c11 -O3 $carch $csan
 
 rule asm
@@ -15,15 +15,29 @@ rule static
   command = libtool -static -o $out $in
 rule cexec
   command = clang $cflags -o $out $in
+rule cc
+  command = clang $cflags -c -o $out $in
+rule run
+  command = $in $inflags > $out
+rule pyrun
+  command = python $in $pyargs > $out
+rule diff
+  command = diff $in > $out
 
 #rule ginger
 #  command = ./scripts/ginger.py $in > $out
 
 build $b/rijn_k32b32.o: asm rijn_k32b32.s
-build $b/rijn_k32b16.o: asm rijn_k32b16.s
 build $b/rijn_k32ks.o:  asm rijn_k32ks.s
+build $b/rijn_ctr.o:    cc  rijn_ctr.c
+build $b/rijn.a: static $b/rijn_ctr.o $b/rijn_k32ks.o $b/rijn_k32b32.o
 
-build $b/rijn.a: static $b/rijn_k32ks.o $b/rijn_k32b32.o $b/rijn_k32b16.o
+build $b/test: cexec $b/rijn.a test_rijn256ctr.c
+
+build $b/ctr_python.txt: pyrun py/ctr_testgen.py
+  pyargs = 1530
+build $b/ctr_c.txt: run $b/test
+build $b/ctrdiff.txt: diff $b/ctr_python.txt $b/ctr_c.txt
 
 #build $b/test: cexec rijn-api.c $b/rijn.a
-build $b/time: cexec test_k32b32.c $b/rijn.a
+#build $b/time: cexec test_k32b32.c $b/rijn.a
