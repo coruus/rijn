@@ -7,6 +7,13 @@ blocksize.
 NB: This code is presently under development. Please do not use it for anything
 other than testing.
 
+## Credits
+
+Adam Langley's Go implementation of Rijndael256 inspired me to write this; its
+clarity was invaluable in understanding how Rijndael instances worked.
+
+Jeet Sukumaran's Python implementation was used to generate testcases.
+
 ## Performance
 
 Measurements taken on a Crystal Well i7-4850HQ with Turbo Boost disabled.
