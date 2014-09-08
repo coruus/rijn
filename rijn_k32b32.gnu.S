@@ -1,40 +1,38 @@
 .align 5
 .data
-
 _rijndael256_mask:
-  .byte 0x0, 0x1, 0x6, 0x7
-  .byte 0x4, 0x5, 0xa, 0xb
-  .byte 0x8, 0x9, 0xe, 0xf
-  .byte 0xc, 0xd, 0x2, 0x3
+.byte 0x0, 0x1, 0x6, 0x7
+.byte 0x4, 0x5, 0xa, 0xb
+.byte 0x8, 0x9, 0xe, 0xf
+.byte 0xc, 0xd, 0x2, 0x3
 
 _sel2:
-  .byte 0, 0xff, 0xff, 0xff
-  .byte 0,    0, 0xff, 0xff
-  .byte 0,    0, 0xff, 0xff
-  .byte 0,    0,    0, 0xff
-
+.byte 0, 0xff, 0xff, 0xff
+.byte 0,    0, 0xff, 0xff
+.byte 0,    0, 0xff, 0xff
+.byte 0,    0,    0, 0xff
 
 .align 5
 .text
 .global _Rijndael_k32b32_encrypt_x4
 _Rijndael_k32b32_encrypt_x4:
 	vzeroupper
-
 	movq	%rdi, %r10
 	movq	%rsi, %r11
-	vmovdqu	_Rijndael_k32b32_encrypt_x4(%rdi), %xmm1
+	vmovdqu	0x00(%rdi), %xmm1
 	vmovdqu	0x10(%rdi), %xmm0
-	vpxor	_Rijndael_k32b32_encrypt_x4(%rdx), %xmm1, %xmm2
+	vpxor	0x00(%rdx), %xmm1, %xmm2
 	vpxor	0x10(%rdx), %xmm0, %xmm3
 	vpxor	0x20(%rdx), %xmm1, %xmm4
 	vpxor	0x30(%rdx), %xmm0, %xmm5
 	vpxor	0x40(%rdx), %xmm1, %xmm6
-	vpxor	Rijndael_k32b32_encrypt_x4._rounds(%rdx), %xmm0, %xmm7
+	vpxor	0x50(%rdx), %xmm0, %xmm7
 	vpxor	0x60(%rdx), %xmm1, %xmm8
 	vpxor	0x70(%rdx), %xmm0, %xmm9
 	movq	$0x1, %r8
 	movq	%r10, %rdi
 
+	.align 4
 	Rijndael_k32b32_encrypt_x4._rounds:
 	  addq	$0x20, %rdi
 	  vpxor	%xmm3, %xmm2, %xmm0
@@ -72,7 +70,6 @@ _Rijndael_k32b32_encrypt_x4:
 	incq	%r8
 	cmpq	$0xe, %r8
 	jne	Rijndael_k32b32_encrypt_x4._rounds
-
 	vpxor	%xmm3, %xmm2, %xmm0
 	vpand	_sel2(%rip), %xmm0, %xmm0
 	vpxor	%xmm0, %xmm2, %xmm2
@@ -115,5 +112,4 @@ _Rijndael_k32b32_encrypt_x4:
 	movdqu	%xmm8, 0x60(%rsi)
 
 	vzeroall
-
 	ret
