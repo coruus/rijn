@@ -68,24 +68,19 @@ __four:  dq  0, 4
 section .text
 
 ; Registers used for the encryption state.
-%define x0 xmm7
-%define x1 xmm8
-%define x2 xmm9
-%define x3 xmm10
-%define x4 xmm11
-%define x5 xmm12
-%define x6 xmm13
-%define x7 xmm14
-%define x8 xmm15
+%define x0 xmm2
+%define x1 xmm3
+%define x2 xmm4
+%define x3 xmm5
+%define x4 xmm6
+%define x5 xmm7
+%define x6 xmm8
+%define x7 xmm9
+%define x8 xmm10
 
 ; The two temporary registers needed for bitops
-%define temp1 xmm1
-%define temp2 xmm3
-; The three masks.
-%define rijndael256_mask xmm2
-%define sel1 xmm4
-%define sel2 xmm5
-%define xcn  xmm6
+%define temp1 xmm0
+%define temp2 xmm1
 
 %macro blockblend_ 0
   ; Swap bytes between the halves of the state.
@@ -93,17 +88,21 @@ section .text
   ;   data1 = (data1 &  sel1) | (data2 &~ sel1)
   ;   data2 = (data1 &~ sel1) | (data2 &  sel1)
   ; Doing this as a masked merge results in a (very slightly) lower
-  ; timing variance. (There are many equivalent ways of doing this;
-  ; not all have been tried.)
-  vpxor temp1, data1, data2   ; temp1 = data1 ^ data2
-  vpand temp2, temp1, sel1    ; temp2 = temp1 & sel1
-  vpand temp1, temp1, sel2    ; temp1 = temp1 & sel2
-  vpxor data2, data1, temp2   ; data2 = data1 ^ temp2
-  vpxor data1, data1, temp1   ; data1 = data1 ^ temp1
+  ; timing variance. (This can be done with one fewer op.) 
+  ;vpxor temp1, data1, data2   ; temp1 = data1 ^ data2
+  ;vpand temp2, temp1, sel1    ; temp2 = temp1 & sel1
+  ;vpand temp1, temp1, sel2    ; temp1 = temp1 & sel2
+  ;vpxor data2, data1, temp2   ; data2 = data1 ^ temp2
+  ;vpxor data1, data1, temp1   ; data1 = data1 ^ temp1
+
+  vpxor temp1, data1, data2
+  vpand temp1, temp1, [rel _sel2]
+  vpxor data1, data1, temp1
+  vpxor data2, data2, temp1
 
   ; Rotate column 2 of each half of the state.
-  vpshufb   data2, data2, rijndael256_mask
-  vpshufb   data1, data1, rijndael256_mask
+  vpshufb   data2, data2, [rel _rijndael256_mask] ;rijndael256_mask
+  vpshufb   data1, data1, [rel _rijndael256_mask] ;rijndael256_mask
 %endmacro
 
 %macro blockblend_off 0
@@ -160,14 +159,11 @@ Rijndael_k32b32_encrypt_x4:
   %define arg1 rdi
   %define arg2 rsi
   %define arg3 rdx
-;  %define arg4 rcx
   
   %define ks  arg1
   %define out arg2  
   %define in  arg3
-;  %define nblocks arg4
-  ; Zero all vector unit registers.
-  vzeroall
+  vzeroupper
 
   mov r10, ks
   mov r11, out
@@ -195,9 +191,9 @@ Rijndael_k32b32_encrypt_x4:
 
   ; Load the selection and shuffle masks:
   ; (This clobbers round 0's ks1 and ks2.)
-  vmovdqa sel1, [_sel1 wrt rip]
-  vmovdqa sel2, [_sel2 wrt rip]
-  vmovdqa rijndael256_mask, [_rijndael256_mask wrt rip]
+  ;vmovdqa sel1, [_sel1 wrt rip]
+  ;vmovdqa sel2, [_sel2 wrt rip]
+  ;vmovdqa rijndael256_mask, [_rijndael256_mask wrt rip]
 
   ; Loop to do rounds 1-13.
   mov r8, 1            ; r_i = 1
@@ -215,162 +211,6 @@ Rijndael_k32b32_encrypt_x4:
   k32b32_lastx  1, x2, x3
   k32b32_lastx  2, x4, x5
   k32b32_lastx  3, x6, x7
-
-;  add out, 32*4
-;  add in,  32*4
-;  sub len, 32*4
-;  jnz ._start
-
-  ; Zero all registers.
-  vzeroall
-
-  ret
-
-; Rijndael_k32b32_encrypt_x1(
-;     void* restrict ks,    // rdi
-;     void* dst,            // rsi
-;     const void* src       // rdx
-; ): Encrypt 1 block.
-align 32
-global Rijndael_k32b32_encrypt_x1
-Rijndael_k32b32_encrypt_x1:
-  %define arg1 rdi
-  %define arg2 rsi
-  %define arg3 rdx
-  
-  %define ks  arg1
-  %define out arg3  
-  %define in  arg2
-  ; Zero all vector registers. Critical for performance.
-  vzeroall
-
-  mov r10, ks
-  mov r11, out
-  mov rcx, 32*4
-
-  %define ks1 xmm1
-  %define ks2 xmm0
-
-  ; Load ks[0:8]
-  vmovdqu ks1, [ks]        ; ks1 = ks[0:4]
-  vmovdqu ks2, [ks+16]     ; ks2 = ks[4:8]
-  
-  ; Round 0, xor with key:
-  ;   x[0:4] ^= ks[0:4]
-  ;   x[4:8] ^= ks[4:8]
-  vpxor x0, ks1, [in+0]
-  vpxor x1, ks2, [in+16]
-
-  ; Load the selection and shuffle masks. (This clobbers round 0's ks1 and ks2.)
-  vmovdqa sel1, [_sel1 wrt rip]
-  vmovdqa sel2, [_sel2 wrt rip]
-  vmovdqa rijndael256_mask, [_rijndael256_mask wrt rip]
-
-  ; Loop to do rounds 1-13.
-  mov r8, 1            ; r_i = 1
-  mov ks, r10          ; ks_i = ks_start
-  align 16
-  ._rounds:
-    add ks, 32         ; ks_i += 32       ; Advance scheduled keys.
-    k32b32_roundx 0, x0, x1               ; Do the round.
-    inc r8             ; i += 1           ; Increment the round counter.
-    cmp r8, 14         ; if (i != 14)     ; And repeat, until we've gotten
-    jne ._rounds       ;   goto ._rounds  ; to the 14th round.
-
-  ; Do round 14, and store the encrypted blocks.
-  k32b32_lastx  0, x0, x1
-
-  ; Zero all vector registers.
-  vzeroall
-  ret
-
-
-; Rijndael_k32b32_ctr(
-;     void* restrict ks,    // rdi
-;     void* dst,            // rsi
-;     const void* src       // rdx
-;     void* nc              // rcx
-; ): Encrypt 4 blocks.
-align 32
-global Rijndael_k32b32_ctr
-Rijndael_k32b32_ctr:
-  %define arg1 rdi
-  %define arg2 rsi
-  %define arg3 rdx
-  %define arg4 rcx
-  
-  %define ks  arg1
-  %define out arg2  
-  %define in  arg3
-  %define nc  arg4
-  ; Zero all vector unit registers.
-  vzeroall
-
-  mov r10, ks
-  mov r11, out
-
-  %define ks1 xmm1
-  %define ks2 xmm0
-
-;  align 16
-;  ._start
-  ; Load ks[0:8]
-  vmovdqu ks1, [ks]        ; ks1 = ks[0:4]
-  vmovdqu ks2, [ks+16]     ; ks2 = ks[4:8]
- 
-  vmovdqu x0, [nc+0 ]
-  vmovdqu x1, [nc+1 ]
-  vmovdqa xcn, x1
-  
-  vmovdqa x2, x0
-  vmovdqa x4, x0
-  vmovdqa x6, x0
-
-  vpaddq   x3, x1, one
-  vpaddq   x5, x1, two
-  vpaddq   x7, x1, three
-  vpaddq   xcn, x1, four
-  vmovdqu  [nc+1], xcn
-
-  ; Round 0, xor with key:
-  ;   x[0:4] ^= ks[0:4]
-  ;   x[4:8] ^= ks[4:8]
-  vpxor x0, ks1, x0
-  vpxor x1, ks2, x1
-  vpxor x2, ks1, x2 
-  vpxor x3, ks2, x3
-  vpxor x4, ks1, x4
-  vpxor x5, ks2, x5
-  vpxor x6, ks1, x6
-  vpxor x7, ks2, x7 
-
-  ; Load the selection and shuffle masks:
-  ; (This clobbers round 0's ks1 and ks2.)
-  vmovdqa sel1, [_sel1 wrt rip]
-  vmovdqa sel2, [_sel2 wrt rip]
-  vmovdqa rijndael256_mask, [_rijndael256_mask wrt rip]
-
-  ; Loop to do rounds 1-13.
-  mov r8, 1            ; r_i = 1
-  mov ks, r10          ; ks_i = ks_start
-  align 16
-  ._rounds:
-    add ks, 32         ; ks_i += 32       ; Advance scheduled keys.
-    _k32b32_roundx4 0  ;                  ; Do the round.
-    inc r8             ; i += 1           ; Increment the round counter.
-    cmp r8, 14         ; if (i != 14)     ; And repeat, until we've gotten
-    jne ._rounds       ;   goto ._rounds  ; to the 14th round.
-
-  ; Do round 14, and store the encrypted blocks.
-  k32b32_lastx  0, x0, x1
-  k32b32_lastx  1, x2, x3
-  k32b32_lastx  2, x4, x5
-  k32b32_lastx  3, x6, x7
-
-;  add out, 32*4
-;  add in,  32*4
-;  sub len, 32*4
-;  jnz ._start
 
   ; Zero all registers.
   vzeroall

@@ -24,6 +24,8 @@
 #undef memset_s
 #define memset_s(DST, DSTLEN, VAL, OPLEN) memset((DST), (DSTLEN), (VAL))
 
+// We don't expect that this vector size will exist, but both clang and
+// GCC seem to generate decent enough code nonetheless.
 typedef uint64_t v16u8 __attribute__((__vector_size__(16*8)));
 
 static const v16u8 increment = { 0, 0, 0, 4,
@@ -39,13 +41,13 @@ static inline void _full_xor(const void* ks,
   v16u8* outv = (v16u8*)out;
   v16u8* inv = (v16u8*)in;
   while (nblocks != 0) {
-    v16u8 buf = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  
+    v16u8 buf = {0};
     Rijndael_k32b32_encrypt_x4(ks, &buf, nc);
     *outv = *inv ^ buf;
     outv++;
     inv++;
     nblocks--;
-    *nc = *nc + increment;    
+    *nc = *nc + increment;
   }
 }
 
@@ -56,9 +58,10 @@ static inline void _partial_xor(const void* ks,
                                 size_t inlen) {
   uint8_t* outb = (uint8_t*)out;
   uint8_t* inb = (uint8_t*)in;
-  v16u8 buf = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-  uint8_t* bufb = (uint8_t*)&buf;
+  v16u8 buf = {0};
   Rijndael_k32b32_encrypt_x4(ks, &buf, nc);
+  
+  uint8_t* bufb = (uint8_t*)&buf;
   for (size_t i = 0; i < inlen; i++) {
     outb[i] = inb[i] ^  bufb[i];
   }
@@ -101,7 +104,7 @@ int rijndael256_ctr_xor(uint8_t* out,
 static inline void _full_stream(const void* ks, void* out, v16u8* nc, size_t nblocks) {
   v16u8* outv = (v16u8*)out;
   while (nblocks != 0) {
-    v16u8 buf = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };  
+    v16u8 buf = {0};
     Rijndael_k32b32_encrypt_x4(ks, &buf, nc);
     *outv = buf;
     outv++;
@@ -112,7 +115,7 @@ static inline void _full_stream(const void* ks, void* out, v16u8* nc, size_t nbl
 
 static inline void _partial_stream(const void* ks, void* out, v16u8* nc, size_t inlen) {
   uint8_t* outb = (uint8_t*)out;
-  v16u8 buf = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  v16u8 buf = {0};
   uint8_t* bufb = (uint8_t*)&buf;
   Rijndael_k32b32_encrypt_x4(ks, &buf, nc);
   for (size_t i = 0; i < inlen; i++) {
@@ -135,12 +138,15 @@ int rijndael256_ctr_stream(uint8_t* out, uint64_t oplen, const void* _n, const v
 
   // Expand the key.
   Rijndael_k32b32_expandkey(ks, k);
+
   // Encrypt full 128-byte blocks.
   if (oplen >= 128) {
     _full_stream(ks, out, &nc, oplen / 128);
   }
+
   uint64_t done = (oplen / 128) * 128;
   oplen -= done;
+
   // Encrypt any remaining bytes.
   if (oplen != 0) {
     _partial_stream(ks, (uint8_t*)out + done, &nc, oplen);

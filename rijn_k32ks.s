@@ -90,40 +90,6 @@ _Rijndael_k32_expand_one:
 %endmacro
 
 align 32
-global Rijndael_k32b16_expandkey 
-Rijndael_k32b16_expandkey:
-  vzeroall
-
-  loadk32
-
-  ; Load the shuffle mask used by key_expansion
-  vmovdqa shuffle_mask, [_Rijndael_k32_shuffle_mask wrt rip]
-
-  k32_expand 0x01
-  k32_expand 0x02
-  k32_expand 0x04
-  k32_expand 0x08
-  k32_expand 0x10
-  k32_expand 0x20
-  vaeskeygenassist xmm2, key2, 0x40
-
-  vpshufd xmm2, xmm2, 011111111b
-
-  vpshufb xmm4, key1, shuffle_mask  ; xmm4 = shuf(key1, shuffle_mask)
-  vpxor   key1, key1, xmm4          ; key1 ^= xmm4
-  vpshufb xmm4, xmm4, shuffle_mask  ; xmm4 = shuf(xmm4, shuffle_mask)
-  vpxor   key1, key1, xmm4          ; key1 ^= xmm4
-  vpshufb xmm4, xmm4, shuffle_mask  ; xmm4 = shuf(xmm4, shuffle_mask)
-  vpxor   key1, key1, xmm4          ; key1 ^= xmm4
-  vpxor   key1, key1, xmm2          ; key1 ^= xmm2
-
-  vmovdqu [rdi], key1
-
-  vzeroall
-  ret 
-
-
-align 32
 global Rijndael_k32b32_expandkey
 Rijndael_k32b32_expandkey:
   vzeroall
