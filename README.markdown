@@ -29,7 +29,7 @@ AES-256-GCM on this system.)
 
 ## Notes
 
-2.2x faster than Shay Gueron's suggested implementation in his [AESNI whitepaper]
+2.2x faster than Shay Gueron's suggested implementation in his [AESNI whitepaper][iaesni]
 for Intel. (The whitepaper uses PBLENDVB, which dispatches 2 muops to p5. But p5
 is already a bottleneck for the AESNI instructions.)
 
@@ -41,4 +41,4 @@ block cipher. This is better than any generic construction with a decent securit
 proof.
 
 
-[iaesni]: https://software.intel.com/en-us/articles/intel-advanced-encryption-standard-aes-instructions-set "Shay Gueron. Intel Advanced Encryption Standard (AES) New Instruction Set"
+[iaesni]: https://software.intel.com/en-us/articles/intel-advanced-encryption-standard-aes-instructions-set "Shay Gueron. Intel Advanced Encryption Standard (AES New Instruction Set"
