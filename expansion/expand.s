@@ -1,3 +1,12 @@
+/* AES-256 key expansion for processors supporting the AVX
+ * instruction set.
+ *
+ * Implementor: David Leon Gil
+ * License:     Apache2 
+ * Inspired by: Shay Gueron's classic AES-NI whitepaper.
+ * Ack:         Agner Fog's instruction tables.
+ */
+
 #define T1   %xmm0
 #define T2   %xmm1
 #define KEY1 %xmm2
