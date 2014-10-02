@@ -26,8 +26,8 @@ CTR-on-ECB C/assembler for SUPERCOP, including key-expansion:
 ECB mode, AES-256 versus Rijndael-256, not including key-expansion, for
 1350 byte messages:
     
-    16B blocksize: 1.1 GB/s (2.14 cpb)
-    32B blocksize: 2.4 GB/s (0.97 cpb)
+    32B blocksize: 1.1 GB/s (2.14 cpb)
+    16B blocksize: 2.4 GB/s (0.97 cpb)
 
 The relative throughput is thus ~ 0.44.
 
