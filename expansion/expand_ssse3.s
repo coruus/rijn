@@ -1,4 +1,4 @@
-/* AVX: AES-256 key expansion.
+/* SSSE3: AES-256 key expansion 
  *
  * Implementor: David Leon Gil
  * License:     Apache2 
@@ -52,47 +52,53 @@ __shuf_l:
 #define _RC __rc(%rip)
 
 .macro linearmix key, new
-  VPSHUFB  SHUF_L, \key, T1
-  VPXOR      \key,   T1, \key
-  VPSHUFB  SHUF_L, \key, T1
-  VPXOR      \key,   T1, \key
-  VPSHUFB  SHUF_L, \key, T1
-  VPXOR      \key,   T1, \key
-  VPXOR      \key, \new, \key
+  MOVDQA     \key, T1
+  PSHUFB   SHUF_L, T1
+  PXOR         T1, \key
+
+  MOVDQA     \key, T1
+  PSHUFB   SHUF_L, T1
+  PXOR         T1, \key
+
+  MOVDQA     \key, T1
+  PSHUFB   SHUF_L, T1
+  PXOR         T1, \key
+
+  PXOR      \new, \key
 .endm
 
 .text
 .L_DR:
 //__Rijndael_k8w4_expandkey_doubleround:
-  VAESENCLAST     RC, KEY2, T2
-  VPSHUFB     SHUF_2,   T2, T2
+  MOVDQA        KEY2, T2
+  AESENCLAST      RC, T2
+  PSHUFB      SHUF_2, T2
   // Shift the round constant, to prepare for the next round
-  VPSLLD          $1,   RC, RC
+  PSLLD           $1, RC
   
   linearmix KEY1,   T2
-  VMOVDQU  KEY1,  0(KS)
+  MOVDQU  KEY1,  0(KS)
 
-  VPXOR           T1,   T1, T1
-  VPSHUFB     SHUF_1, KEY1, T2
-  VAESENCLAST     T1,   T2, T2
+  PXOR           T1, T1
+  MOVDQA       KEY1, T2
+  PSHUFB     SHUF_1, T2
+  AESENCLAST     T1, T2
 
   linearmix KEY2,   T2
-  VMOVDQU KEY2, 16(KS)
+  MOVDQU    KEY2, 16(KS)
 
   ADDQ $32, KS
   RET
 
 .globl _Rijndael_k8w4_expandkey
 _Rijndael_k8w4_expandkey:
-  VZEROUPPER
-
-  VMOVDQU    0(KEY), KEY1
-  VMOVDQU   16(KEY), KEY2
+  MOVDQU    0(KEY), KEY1
+  MOVDQU   16(KEY), KEY2
   // Load the initial value of the round constant
-  VMOVDQU       _RC, RC
+  MOVDQU       _RC, RC
   // Copy k[0:8] to ks[0:8]
-  VMOVDQU      KEY1,  0(KS)
-  VMOVDQU      KEY2, 16(KS)
+  MOVDQU      KEY1,  0(KS)
+  MOVDQU      KEY2, 16(KS)
   ADD          $32, KS
 
   // Rounds 2..13
@@ -104,11 +110,15 @@ _Rijndael_k8w4_expandkey:
   CALL .L_DR
 
   // Round 14
-  VAESENCLAST     RC, KEY2, T2
-  VPSHUFB     SHUF_2,   T2, T2
+  AESENCLAST     RC, KEY2
+  PSHUFB     SHUF_2, KEY2
   
-  linearmix KEY1,   T2
-  VMOVDQU   KEY1, 0(KS)
+  linearmix KEY1, KEY2
+  MOVDQU    KEY1, 0(KS)
   // Zeroize registers.
-  VZEROALL
+  PXOR KEY1, KEY1
+  PXOR KEY2, KEY2
+  PXOR T1, T1
+  PXOR T2, T2
+  PXOR RC, RC
   RET
