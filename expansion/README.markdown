@@ -5,14 +5,21 @@ otherwise known as AES-256.
 
 Details in [expand.s](https://github.com/coruus/rijn/blob/rijnK8W4/expansion/expand.s)
 
-About 1.8x faster than OpenSSL on Haswell/Crystalwell. 
+About 1.8x faster than OpenSSL on Haswell/Crystalwell. Updated to add:
+About 10 cycles slower that Shay Gueron and Vlad Krasnov's implementation
+for Windows in NSS.
+
+Shay Gueron gives an example in his [AES-NI whitepaper][aesniwp] of doing inline AES key-expansion using AESENCLAST for the 128-bit case.
+
+After writing this code, I discovered that his and Vlad Krasnov's implementation of [key expansion for NSS on Windows does][nss_masm], in fact, uses just this approach. Plus another clever trick involving shifting. (The implementation for [Unix systems][nss_gas] in NSS uses AESKEYGENASSIST, oddly enough.)
 
 How? By avoiding AESKEYGENASSIST in favor of AESENCLAST+PSHUFB.
 
 Crystal Well (i7-4850HQ), Turbo Boost disabled:
 
-    OpenSSL:  195 cycles
-    expand.s: 108 cycles
+    OpenSSL:     195 cycles
+    expand.s:    108 cycles
+    intel-nss.s:  97 cycles
 
 To test, run `./test_gnu.sh`. (The build script has only been tested on OSX, with a recent version of Clang's built-in assembler.)
 
@@ -20,18 +27,11 @@ To test, run `./test_gnu.sh`. (The build script has only been tested on OSX, wit
 
 [strip_ossl.patch](https://github.com/coruus/rijn/blob/rijnK8W4/expansion/strip_ossl.patch): A patch to strip the multi keylength selection code from the OpenSSL implementation; doesn't affect benchmarks.
 
-## Other microarchitectures
-
-Untested on Bridge (I'd expect a slightly smaller gain from this strategy for that microarchitecture). 
-
-An SSSE3 version is available; I am uncertain whether this code will be faster on microarchs that don't support AVX. (The performance of the SSSE3 code on Haswell is, of course, identical to the performance of the AVX code.)
-
-If you have an older platform available, benchmark numbers greatly appreciated.
-
-## Other keylengths
-
-I don't intend on porting this to other keylengths. But there is no reason that this strategy will not produce similar performance gains.
-
 ## Credits
 
-Agner Fog's [instruction tables](http://agner.org/optimize/) makes this approach obvious, if you are the sort of person who really enjoys reading instruction tables.)
+Agner Fog's [instruction tables][agner] makes the benefits of this approach obvious, if you are the sort of person who really enjoys reading instruction tables.)
+
+[nss_gas]: http://hg.mozilla.org/projects/nss/file/044f3e56c4d1/lib/freebl/intel-aes.s#l1580
+[nss_masm]: http://hg.mozilla.org/projects/nss/file/044f3e56c4d1/lib/freebl/intel-aes-x64-masm.asm#l435
+[agner]: http://agner.org/optimize/
+[aesniwp]: https://software.intel.com/en-us/articles/intel-advanced-encryption-standard-aes-instructions-set "Intel® Advanced Encryption Standard (AES) Instructions Set - Rev 3.01"

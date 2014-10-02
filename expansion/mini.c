@@ -65,18 +65,21 @@ int time_expansion(void) {
   uint32_t ks_this[60] = {0};
   AesKey aeskey;
 
-  uint64_t ossl, local;
+  uint64_t ossl, local, nss;
   // Subsequent calls are independent. (That is, their execution
   // may overlap.)
   printf("Overlapped:\n");
   REP(ossl, aesni_set_encrypt_key((void*)test_k, 256, &aeskey));
   REP(local, Rijndael_k8w4_expandkey(ks_this, test_k));
+  REP(nss, intel_aes_encrypt_init_256(ks_this, test_k));
   printf("\nDependent:\n");
   // Subsequent calls chain on the last round keys.
   REP(ossl, aesni_set_encrypt_key(aeskey.rd_key + 60-16, 256, &aeskey));
   REP(ossl, aesni_set_encrypt_key(aeskey.rd_key + 60-16, 256, &aeskey));
   REP(local, Rijndael_k8w4_expandkey(ks_this, ks_this+60-16));
   REP(local, Rijndael_k8w4_expandkey(ks_this, ks_this+60-16));
+  REP(nss, intel_aes_encrypt_init_256(ks_this, test_k+60-16));
+  REP(nss, intel_aes_encrypt_init_256(ks_this, test_k+60-16));
  
   printf("ratio=%5.2f\n", cpc(local) / cpc(ossl));
   printf("ratio=%5.2f\n", cpc(ossl) / cpc(local));
