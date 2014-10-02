@@ -6,7 +6,12 @@
 	.section	__DATA,__data
 	.align	5
 __rc:
-	.byte	1
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
+	.byte	0
 	.byte	0
 	.byte	0
 	.byte	0
@@ -14,11 +19,6 @@ __rc:
 	.byte	0
 	.byte	0
 	.byte	0
-	.byte	1
-	.byte	0
-	.byte	0
-	.byte	0
-	.byte	1
 	.byte	0
 	.byte	0
 	.byte	0
@@ -94,10 +94,8 @@ __shuf_l:
 	.section	__TEXT,__text,regular,pure_instructions
 .L_DR:
 
-	vpxor	%xmm1, %xmm1, %xmm1
-	vaesenclast	%xmm1, %xmm3, %xmm1
+	vaesenclast	%xmm4, %xmm3, %xmm1
 	vpshufb	__shuf_2(%rip), %xmm1, %xmm1
-	vpxor	%xmm4, %xmm1, %xmm1
 
 	vpslld	$1, %xmm4, %xmm4
 
@@ -128,8 +126,6 @@ __shuf_l:
 	addq	$32, %rdi
 	retq
 
-
-
 	.globl	_Rijndael_k8w4_expandkey
 _Rijndael_k8w4_expandkey:
 	vzeroupper
@@ -152,10 +148,8 @@ _Rijndael_k8w4_expandkey:
 	callq	.L_DR
 
 
-	vpxor	%xmm1, %xmm1, %xmm1
-	vaesenclast	%xmm1, %xmm3, %xmm1
+	vaesenclast	%xmm4, %xmm3, %xmm1
 	vpshufb	__shuf_2(%rip), %xmm1, %xmm1
-	vpxor	%xmm4, %xmm1, %xmm1
 
 	vpshufb	__shuf_l(%rip), %xmm2, %xmm0
 	vpxor	%xmm2, %xmm0, %xmm2

@@ -19,10 +19,10 @@
 .data
 .align 5
 __rc:
-  .byte 1, 0, 0, 0
-  .byte 1, 0, 0, 0
-  .byte 1, 0, 0, 0
-  .byte 1, 0, 0, 0
+  .byte 0, 0, 0, 0
+  .byte 0, 0, 0, 0
+  .byte 0, 1, 0, 0
+  .byte 0, 0, 0, 0
 .quad 0, 0
 
 __shuf_1:
@@ -64,10 +64,8 @@ __shuf_l:
 .text
 .L_DR:
 //__Rijndael_k8w4_expandkey_doubleround:
-  VPXOR           T2,   T2, T2
-  VAESENCLAST     T2, KEY2, T2
+  VAESENCLAST     RC, KEY2, T2
   VPSHUFB     SHUF_2,   T2, T2
-  VPXOR           RC,   T2, T2
   // Shift the round constant, to prepare for the next round
   VPSLLD          $1,   RC, RC
   
@@ -83,8 +81,6 @@ __shuf_l:
 
   ADDQ $32, KS
   RET
-
-#define _DR __Rijndael_k8w4_expandkey_doubleround
 
 .globl _Rijndael_k8w4_expandkey
 _Rijndael_k8w4_expandkey:
@@ -108,10 +104,8 @@ _Rijndael_k8w4_expandkey:
   CALL .L_DR
 
   // Round 14
-  VPXOR           T2,   T2, T2
-  VAESENCLAST     T2, KEY2, T2
+  VAESENCLAST     RC, KEY2, T2
   VPSHUFB     SHUF_2,   T2, T2
-  VPXOR           RC,   T2, T2
   
   linearmix KEY1,   T2
   VMOVDQU   KEY1, 0(KS)
