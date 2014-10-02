@@ -12,7 +12,7 @@ How? By avoiding AESKEYGENASSIST in favor of AESENCLAST+PSHUFB.
 Crystal Well (i7-4850HQ), Turbo Boost disabled:
 
     OpenSSL:  195 cycles
-    expand.s: 109 cycles
+    expand.s: 108 cycles
 
 [ossl_expansion.s](https://github.com/coruus/rijn/blob/rijnK8W4/expansion/ossl_expansion.s): Extracted from the voluminous output of [aesni-x86_64.pl](https://github.com/openssl/openssl/blob/master/crypto/aes/asm/aesni-x86_64.pl)
 

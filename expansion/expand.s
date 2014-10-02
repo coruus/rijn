@@ -32,6 +32,7 @@ __shuf_1:
   .byte 12, 13, 14, 15
 .quad 0, 0
 
+# InvShiftColumns
 __shuf_2:
   .byte 9, 6, 3, 12
   .byte 9, 6, 3, 12
