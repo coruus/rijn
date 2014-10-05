@@ -14,14 +14,15 @@ typedef struct aes_key_st {
     int rounds;
 } AesKey;
 extern void aesni_set_encrypt_key(const void*, int, AesKey*);
-
+extern void intel_aes_encrypt_init_256(void*, const void*);
 extern void Rijndael_k8w4_expandkey(void*, const void*);
 
 int test_expansion(void) {
   uint32_t ks_ossl[60] = {0};
   uint32_t ks_this[60] = {0};
   AesKey aeskey;
-  aesni_set_encrypt_key((void*)test_k, 256, &aeskey);
+  //aesni_set_encrypt_key((void*)test_k, 256, &aeskey);
+  intel_aes_encrypt_init_256(aeskey.rd_key, test_k);
   Rijndael_k8w4_expandkey(ks_this, test_k);
 
 #ifdef APPLE_LIBCRYPTO_MADNESS

@@ -70,7 +70,7 @@ __shuf_l:
   VPSLLD          $1,   RC, RC
   
   linearmix KEY1,   T2
-  VMOVDQU  KEY1,  0(KS)
+  VMOVDQU   KEY1,  0(KS)
 
   VPXOR           T1,   T1, T1
   VPSHUFB     SHUF_1, KEY1, T2
@@ -111,4 +111,6 @@ _Rijndael_k8w4_expandkey:
   VMOVDQU   KEY1, 0(KS)
   // Zeroize registers.
   VZEROALL
+  XOR KS, KS
+  XOR KEY, KEY
   RET

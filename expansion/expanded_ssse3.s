@@ -186,4 +186,6 @@ _Rijndael_k8w4_expandkey:
 	pxor	%xmm0, %xmm0
 	pxor	%xmm1, %xmm1
 	pxor	%xmm4, %xmm4
+	xorq	%rsi, %rsi
+	xorq	%rdi, %rdi
 	retq

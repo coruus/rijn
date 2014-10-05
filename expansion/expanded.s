@@ -164,4 +164,6 @@ _Rijndael_k8w4_expandkey:
 	vmovdqu	%xmm2, (%rdi)
 
 	vzeroall
+	xorq	%rdi, %rdi
+	xorq	%rsi, %rsi
 	retq

@@ -28,16 +28,15 @@
 _intel_aes_encrypt_init_256:
   %define KEY rsi
   %define KS  rdi
-  vzeroupper
 
-  vmovdqu  xmm1, [16*0 + KEY]
-  vmovdqu  xmm3, [16*1 + KEY]
+  movdqu  xmm1, [16*0 + KEY]
+  movdqu  xmm3, [16*1 + KEY]
 
-  vmovdqu  [16*0 + KS], xmm1
-  vmovdqu  [16*1 + KS], xmm3
+  movdqu  [16*0 + KS], xmm1
+  movdqu  [16*1 + KS], xmm3
 
-  vmovdqu  xmm0, [con1    wrt rip]
-  vmovdqu  xmm5, [mask256 wrt rip]
+  movdqu  xmm0, [con1    wrt rip]
+  movdqu  xmm5, [mask256 wrt rip]
 
   pxor    xmm6, xmm6
 
@@ -45,46 +44,56 @@ _intel_aes_encrypt_init_256:
   mov ITR, 6
 
   Lenc_256_ks_loop:
-    vpshufb      xmm2, xmm3, xmm5
-    vaesenclast  xmm2, xmm2, xmm0
-    vpslld   xmm0, xmm0, 1
-    vpslldq  xmm4, xmm1, 4
-    vpxor    xmm1, xmm1, xmm4
-    vpslldq  xmm4, xmm4, 4
-    vpxor    xmm1, xmm1, xmm4
-    vpslldq  xmm4, xmm4, 4
-    vpxor    xmm1, xmm1, xmm4
-    vpxor    xmm1, xmm1, xmm2
-    vmovdqu  [16*2 + KS], xmm1
+    movdqa  xmm2, xmm3
+    pshufb  xmm2, xmm5
+    aesenclast  xmm2, xmm0
+    pslld   xmm0, 1
+    movdqa  xmm4, xmm1
+    pslldq  xmm4, 4
+    pxor    xmm1, xmm4
+    pslldq  xmm4, 4
+    pxor    xmm1, xmm4
+    pslldq  xmm4, 4
+    pxor    xmm1, xmm4
+    pxor    xmm1, xmm2
+    movdqu  [16*2 + KS], xmm1
 
-    vpshufd  xmm2, xmm1, 0ffh
-    vaesenclast  xmm2, xmm2, xmm6
-    vpslldq  xmm4, xmm3, 4
-    vpxor    xmm3, xmm3, xmm4
-    vpslldq  xmm4, xmm4, 4
-    vpxor    xmm3, xmm3, xmm4
-    vpslldq  xmm4, xmm4, 4
-    vpxor    xmm3, xmm3, xmm4
-    vpxor    xmm3, xmm3, xmm2
-    vmovdqu  [16*3 + KS], xmm3
+    pshufd  xmm2, xmm1, 0ffh
+    aesenclast  xmm2, xmm6
+    movdqa  xmm4, xmm3
+    pslldq  xmm4, 4
+    pxor    xmm3, xmm4
+    pslldq  xmm4, 4
+    pxor    xmm3, xmm4
+    pslldq  xmm4, 4
+    pxor    xmm3, xmm4
+    pxor    xmm3, xmm2
+    movdqu  [16*3 + KS], xmm3
 
     ;lea KS, [32 + KS]
     add KS, 32
     dec ITR
     jnz Lenc_256_ks_loop
 
-  vpshufb      xmm2, xmm3, xmm5
-  vaesenclast  xmm2, xmm2, xmm0
-  vpslldq  xmm4, xmm1, 4
-  vpxor    xmm1, xmm4
-  vpslldq  xmm4, xmm4, 4
-  vpxor    xmm1, xmm4
-  vpslldq  xmm4, xmm4, 4
-  vpxor    xmm1, xmm1, xmm4
-  vpxor    xmm1, xmm1, xmm2
-  vmovdqu  [16*2 + KS], xmm1
+  movdqa  xmm2, xmm3
+  pshufb  xmm2, xmm5
+  aesenclast  xmm2, xmm0
+  movdqa  xmm4, xmm1
+  pslldq  xmm4, 4
+  pxor    xmm1, xmm4
+  pslldq  xmm4, 4
+  pxor    xmm1, xmm4
+  pslldq  xmm4, 4
+  pxor    xmm1, xmm4
+  pxor    xmm1, xmm2
+  movdqu  [16*2 + KS], xmm1
 
-  vzeroall
+  pxor xmm0, xmm0
+  pxor xmm1, xmm1
+  pxor xmm2, xmm2
+  pxor xmm3, xmm3
+  pxor xmm4, xmm4
+  pxor xmm5, xmm5
   xor KS, KS
   xor KEY, KEY
 

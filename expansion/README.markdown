@@ -9,11 +9,11 @@ About 1.8x faster than OpenSSL on Haswell/Crystalwell. Updated to add:
 About 10 cycles slower that Shay Gueron and Vlad Krasnov's implementation
 for Windows in NSS.
 
-Shay Gueron gives an example in his [AES-NI whitepaper][aesniwp] of doing inline AES key-expansion using AESENCLAST for the 128-bit case.
-
-After writing this code, I discovered that his and Vlad Krasnov's implementation of [key expansion for NSS on Windows does][nss_masm], in fact, uses just this approach. Plus another clever trick involving shifting. (The implementation for [Unix systems][nss_gas] in NSS uses AESKEYGENASSIST, oddly enough.)
-
 How? By avoiding AESKEYGENASSIST in favor of AESENCLAST+PSHUFB.
+
+## Details
+
+After writing expand.s, I discovered that his and Vlad Krasnov's implementation of [key expansion for NSS on Windows does][nss_masm], in fact, uses just this approach. Plus another clever trick involving shifting. (The implementation for [Unix systems][nss_gas] in NSS uses AESKEYGENASSIST, oddly enough.)
 
 Crystal Well (i7-4850HQ), Turbo Boost disabled:
 
@@ -21,7 +21,7 @@ Crystal Well (i7-4850HQ), Turbo Boost disabled:
     expand.s:    108 cycles
     intel-nss.s:  97 cycles
 
-To test, run `./test_gnu.sh`. (The build script has only been tested on OSX, with a recent version of Clang's built-in assembler.)
+To test, run `./test_avx.sh`. (The build script has only been tested on OSX, with a recent version of Clang's built-in assembler and yasm.)
 
 [ossl_expansion.s](https://github.com/coruus/rijn/blob/rijnK8W4/expansion/ossl_expansion.s): Extracted from the voluminous output of [aesni-x86_64.pl](https://github.com/openssl/openssl/blob/master/crypto/aes/asm/aesni-x86_64.pl)
 
@@ -29,7 +29,9 @@ To test, run `./test_gnu.sh`. (The build script has only been tested on OSX, wit
 
 ## Credits
 
-Agner Fog's [instruction tables][agner] makes the benefits of this approach obvious, if you are the sort of person who really enjoys reading instruction tables.)
+Agner Fog's [instruction tables][agner] makes the benefits of this approach obvious, if you are the sort of person who really enjoys reading instruction tables.
+
+Shay Gueron gives an example in his [AES-NI whitepaper][aesniwp] of doing inline AES key-expansion using AESENCLAST for the 128-bit case.
 
 [nss_gas]: http://hg.mozilla.org/projects/nss/file/044f3e56c4d1/lib/freebl/intel-aes.s#l1580
 [nss_masm]: http://hg.mozilla.org/projects/nss/file/044f3e56c4d1/lib/freebl/intel-aes-x64-masm.asm#l435

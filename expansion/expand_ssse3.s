@@ -121,4 +121,6 @@ _Rijndael_k8w4_expandkey:
   PXOR T1, T1
   PXOR T2, T2
   PXOR RC, RC
+  XOR KEY, KEY
+  XOR  KS, KS
   RET
