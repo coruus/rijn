@@ -18,9 +18,9 @@ extern void AES_set_encrypt_key(const void*, int, AesKey*);
 
 extern void aes256_ctr4(void* out,
                         const void* in,
+                        size_t oplen,
                         const void* key,
-                        const void* nc,
-                        void* ks);
+                        const void* nc);
 extern void aes256_ctr8(void* out,
                         const void* in,
                         const void* key,
@@ -64,31 +64,31 @@ static inline void osslctr128(void* buf_ossl, const void* k, void* aeskey) {
 }
 
 #define TEST_CTREX(N)                                                          \
-  do {                                                                         \
+  do { for (int i = 1; i <= 16; i++) {\
     memset(buf, 0x00, 128);                                                    \
     memset(buf_ossl, 0x00, 128);                                               \
     memset(ivec, 0, 16);                                                       \
     memset(ecou, 0, 16);                                                       \
     memset(ks, 0, 224);                                                        \
     num = 0;                                                                   \
-    AES_ctr128_encrypt(buf_ossl, buf_ossl, 16 * N, &aeskey, ivec, ecou, &num); \
-    aes256_ctr##N(buf, buf, test_k, buf, ks);                                  \
+    AES_ctr128_encrypt(buf_ossl, buf_ossl, 16 * (N-1) + i, &aeskey, ivec, ecou, &num); \
+    aes256_ctr##N(buf, buf, 16 * (N-1) + i, test_k,  buf);                                  \
     printbuf(buf, 16 * N);                                                      \
     printbuf(buf_ossl, 16 * N);                                                 \
     if (memcmp(buf, buf_ossl, 16 * N) != 0) {                                  \
-      printf("%u CTR_32: FAIL\n", N);                                          \
-      printbuf(buf, 128);                                                      \
-      printbuf(buf_ossl, 128);                                                 \
+      printf("%u %u CTR_32: FAIL\n", N, i);                                          \
+      printbuf(buf, 16*N);                                                      \
+      printbuf(buf_ossl, 16*N);                                                 \
       return -1;                                                               \
     } else {                                                                   \
-      printf("%u CTR: OKAY\n", N);                                             \
+      printf("%u %u CTR: OKAY\n", N, i);                                             \
     }                                                                          \
     if ((128 - 16 * N) && (memcmp(buf + 16 * N, ZERO, 128 - 16 * N) != 0)) {   \
       printf("%u CTR: OVERWRITE\n", N);                                        \
     } else {                                                                   \
       /*printf("%u CTR_32: OOKAY\n", N);     */                                \
     }                                                                          \
-  } while (0)
+  }} while (0)
 
 static const uint8_t ZERO[128] = {0};
 
@@ -139,7 +139,7 @@ int time_expansion(void) {
   uint64_t ossl32, local, ossl128; // cycle counters
   REP(ossl128, osslctr128(buf, test_k, &aeskey));
   REP(ossl32, osslctr(buf, test_k, &aeskey));
-  REP(local, aes256_ctr4(buf, buf, test_k, buf, ks_this));
+  REP(local, aes256_ctr4(buf, buf, 64, test_k,  buf));
 
   printf("%5.2fx faster\n", cpc(ossl32) / cpc(local));
 

@@ -36,10 +36,11 @@
 
 #define IN   %rsi
 #define OUT  %rdi
-#define KEY  %rdx
-#define NC   %rcx
-#define KS   %r8
+#define LEN  %rdx
+#define KEY  %rcx
+#define NC   %r8
 #define I    %rax
+#define KS %rcx
 
 .data
 .align 5
@@ -124,7 +125,7 @@ _aes256_ctr4:
   
   VPXOR    0(NC), KEY1, X0
   linearmix KEY1,   T0
-
+/*
   VBROADCASTI128 0(NC), Y1
   VBROADCASTI128 0(KEY), Y7
   VPSHUFB __ctrswap(%rip), Y1, Y1
@@ -134,13 +135,36 @@ _aes256_ctr4:
   VPSHUFB __ctrswap(%rip), Y3, Y3
   VPXOR Y1, Y7, Y1
   VEXTRACTI128 $1, Y1, X2
+  VPXOR Y3, Y7, Y3*/
+  VBROADCASTI128 0(NC), Y1
+  VBROADCASTI128 0(KS), Y7
+  VPSHUFB __ctrswap(%rip), Y1, Y1
+  VPADDD   __onetwo(%rip), Y1, Y1
+  VPADDD   __twotwo(%rip), Y1, Y3
+  VPADDD   __twotwo(%rip), Y3, Y5
+  VPSHUFB __ctrswap(%rip), Y1, Y1
+  VPSHUFB __ctrswap(%rip), Y3, Y3
+  VPSHUFB __ctrswap(%rip), Y5, Y5
+  VPXOR Y1, Y7, Y1
+  VEXTRACTI128 $1, Y1, X2
   VPXOR Y3, Y7, Y3
+  VEXTRACTI128 $1, Y3, X4
+  VPXOR Y5, Y7, Y5
+  VEXTRACTI128 $1, Y5, X6
+
+  MOV   12(KEY), %r11d
+  MOVBE 12(NC ), %r9d
+  ADD        $7, %r9d
+  BSWAP   %r9d
+  XOR     %r11d, %r9d
+  VPINSRD $3, %r9d, X0, X7
 
   PREFETCHt0 (IN)
   PREFETCHw  (OUT)
 
   VPSHUFD      $0xff, KEY1, T0
   VAESENCLAST   ZERO,   T0, T0
+
 
   VAESENC   KEY2, X0, X0
   VAESENC   KEY2, X1, X1
@@ -156,8 +180,6 @@ _aes256_ctr4:
   MOV $5, I
   .align 4
   L_ctr4:
-    // Unrolling any further is of little benefit. (About 4
-    // cycles.)
     VPSHUFB     SHUF_2, KEY2, T0
     VAESENCLAST     RC,   T0, T0
     VPSLLD          $1,   RC, RC
@@ -176,7 +198,6 @@ _aes256_ctr4:
     VAESENC  KEY1, X1, X1
     VAESENC  KEY1, X2, X2
     VAESENC  KEY1, X3, X3
-  ADDQ $32, KS
   DEC I
   JNZ L_ctr4
 
@@ -197,20 +218,62 @@ _aes256_ctr4:
   VAESENCLAST      KEY1, X3, X3
 
   VPXOR 0*16(IN), X0, X0
-  VPXOR 1*16(IN), X1, X1
-  VPXOR 2*16(IN), X2, X2
-  VPXOR 3*16(IN), X3, X3
-
   VMOVDQU X0, 0*16(OUT)
+  VPXOR 1*16(IN), X1, X1
   VMOVDQU X1, 1*16(OUT)
+  VPXOR 2*16(IN), X2, X2
   VMOVDQU X2, 2*16(OUT)
-  VMOVDQU X3, 3*16(OUT)
+  CMPQ $64, LEN
+  VMOVDQU X3, X0
+  MOVQ $48, %rcx
+  JNE L_last
+  VPXOR 3*16(IN), X3, X3
+  VMOVDQU X3, 3*16(OUT)  
 
+.align 4
+L_done:
   // Zeroize registers.
   VZEROALL
   XOR KS, KS
   XOR KEY, KEY
+  XOR %rax, %rax
+  XOR %rcx, %rcx
+  XOR LEN, LEN
+  XOR NC, NC
   RET
+
+L_last:
+  SUBQ %rcx, LEN
+  CMPQ $16, LEN
+  VMOVDQU X3, X0
+  JL L_mopup
+  VPXOR 3*16(IN), X3, X3
+  VMOVDQU X3, 3*16(OUT)
+
+L_mopup:
+  VMOVQ X0, %rax
+  CMPQ $8, LEN
+  JL L_mopup_loop
+  VPSHUFD $0xe, X0, X0    # X0[0:4] = {X0[2], X0[3], ... }
+
+  XORQ (IN, %rcx), %rax
+  MOVQ %rax, (OUT, %rcx)
+  ADDQ $8, %rcx
+  SUBQ $8, LEN
+  JZ L_done
+
+  VMOVQ X0, %rax
+
+L_mopup_loop:
+  XORB (IN, %rcx), %al
+  MOVB %al, (OUT, %rcx)
+  RORX $8, %rax, %rax
+  INC %rcx
+  DEC LEN
+  JNZ L_mopup_loop
+
+  JMP L_done
+  
 
 .globl _aes256_ctr8
 _aes256_ctr8:
@@ -254,10 +317,6 @@ _aes256_ctr8:
   PREFETCHt0 (IN)
   PREFETCHw  (OUT)
 
-  //VPXOR X5, KEY1, X5
-  //VMOVDQU X5, 5*16(OUT)
-  //ret
-
   MOV $6, I
   .align 4
   L_ctr8:
@@ -266,7 +325,6 @@ _aes256_ctr8:
     VPSLLD          $1,   RC, RC
 
     linearmix KEY1,   T0
-    VMOVDQU   KEY1, 16*2(KS)
     VAESENC   KEY2, X0, X0
     VAESENC   KEY2, X1, X1
     VAESENC   KEY2, X2, X2
@@ -280,7 +338,6 @@ _aes256_ctr8:
     VAESENCLAST   ZERO,   T0, T0
 
     linearmix KEY2,   T0
-    VMOVDQU  KEY2, 16*3(KS)
     VAESENC  KEY1, X0, X0
     VAESENC  KEY1, X1, X1
     VAESENC  KEY1, X2, X2
@@ -299,7 +356,6 @@ _aes256_ctr8:
   VPSLLD          $1,   RC, RC
 
   linearmix KEY1,   T0
-  VMOVDQU   KEY1, 16*2(KS)
   VAESENC   KEY2, X0, X0
   VAESENC   KEY2, X1, X1
   VAESENC   KEY2, X2, X2
@@ -335,11 +391,7 @@ _aes256_ctr8:
   VMOVDQU X5, 5*16(OUT)
   VMOVDQU X6, 6*16(OUT)
   VMOVDQU X7, 7*16(OUT)
-  // Zeroize registers.
-  VZEROALL
-  XOR KS, KS
-  XOR KEY, KEY
-  RET
+  JMP L_done
 
 
 
