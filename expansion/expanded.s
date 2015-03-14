@@ -1,89 +1,37 @@
-	.section	__TEXT,__text,regular,pure_instructions
-
-
-
-
-	.section	__DATA,__data
-	.align	5
+# 1 "expand.s"
+# 1 "<built-in>" 1
+# 1 "expand.s" 2
+# 18 "expand.s"
+.data
+.align 5
 __rc:
-	.byte	0
-	.byte	0
-	.byte	0
-	.byte	0
-	.byte	0
-	.byte	0
-	.byte	0
-	.byte	0
-	.byte	0
-	.byte	1
-	.byte	0
-	.byte	0
-	.byte	0
-	.byte	0
-	.byte	0
-	.byte	0
-	.quad	0
-	.quad	0
+  .byte 0, 0, 0, 0
+  .byte 0, 0, 0, 0
+  .byte 0, 1, 0, 0
+  .byte 0, 0, 0, 0
+.quad 0, 0
 
 __shuf_1:
-	.byte	12
-	.byte	13
-	.byte	14
-	.byte	15
-	.byte	12
-	.byte	13
-	.byte	14
-	.byte	15
-	.byte	12
-	.byte	13
-	.byte	14
-	.byte	15
-	.byte	12
-	.byte	13
-	.byte	14
-	.byte	15
-	.quad	0
-	.quad	0
+  .byte 12, 13, 14, 15
+  .byte 12, 13, 14, 15
+  .byte 12, 13, 14, 15
+  .byte 12, 13, 14, 15
+.quad 0, 0
 
-
+ # InvShiftColumns
 
 __shuf_2:
-	.byte	9
-	.byte	6
-	.byte	3
-	.byte	12
-	.byte	9
-	.byte	6
-	.byte	3
-	.byte	12
-	.byte	9
-	.byte	6
-	.byte	3
-	.byte	12
-	.byte	9
-	.byte	6
-	.byte	3
-	.byte	12
-	.quad	0
-	.quad	0
+  .byte 9, 6, 3, 12
+  .byte 9, 6, 3, 12
+  .byte 9, 6, 3, 12
+  .byte 9, 6, 3, 12
+.quad 0, 0
 
 __shuf_l:
-	.byte	255
-	.byte	255
-	.byte	255
-	.byte	255
-	.byte	0
-	.byte	1
-	.byte	2
-	.byte	3
-	.byte	4
-	.byte	5
-	.byte	6
-	.byte	7
-	.byte	8
-	.byte	9
-	.byte	10
-	.byte	11
+  .byte 0xff, 0xff, 0xff, 0xff
+  .byte 0x0, 0x1, 0x2, 0x3
+  .byte 0x4, 0x5, 0x6, 0x7
+  .byte 0x8, 0x9, 0xa, 0xb
 
 
 
@@ -91,79 +39,66 @@ __shuf_l:
 
 
 
+.macro linearmix key, new
+  VPSHUFB __shuf_l(%rip), \key, %xmm2
+  VPXOR \key, %xmm2, \key
+  VPSHUFB __shuf_l(%rip), \key, %xmm2
+  VPXOR \key, %xmm2, \key
+  VPSHUFB __shuf_l(%rip), \key, %xmm2
+  VPXOR \key, %xmm2, \key
+  VPXOR \key, \new, \key
+.endm
 
-
-	.section	__TEXT,__text,regular,pure_instructions
+.text
 .L_DR:
 
-	vaesenclast	%xmm4, %xmm3, %xmm1
-	vpshufb	__shuf_2(%rip), %xmm1, %xmm1
+  VAESENCLAST %xmm4, %xmm3, %xmm1
+  VPSHUFB __shuf_2(%rip), %xmm1, %xmm1
 
-	vpslld	$1, %xmm4, %xmm4
+  VPSLLD $1, %xmm4, %xmm4
 
-	vpshufb	__shuf_l(%rip), %xmm2, %xmm0
-	vpxor	%xmm2, %xmm0, %xmm2
-	vpshufb	__shuf_l(%rip), %xmm2, %xmm0
-	vpxor	%xmm2, %xmm0, %xmm2
-	vpshufb	__shuf_l(%rip), %xmm2, %xmm0
-	vpxor	%xmm2, %xmm0, %xmm2
-	vpxor	%xmm2, %xmm1, %xmm2
+  linearmix %xmm0, %xmm1
+  VMOVDQU %xmm0, 0(%rdi)
 
-	vmovdqu	%xmm2, (%rdi)
+  VPXOR %xmm2, %xmm2, %xmm2
+  VPSHUFB __shuf_1(%rip), %xmm0, %xmm1
+  VAESENCLAST %xmm2, %xmm1, %xmm1
 
-	vpxor	%xmm0, %xmm0, %xmm0
-	vpshufb	__shuf_1(%rip), %xmm2, %xmm1
-	vaesenclast	%xmm0, %xmm1, %xmm1
+  linearmix %xmm3, %xmm1
+  VMOVDQU %xmm3, 16(%rdi)
 
-	vpshufb	__shuf_l(%rip), %xmm3, %xmm0
-	vpxor	%xmm3, %xmm0, %xmm3
-	vpshufb	__shuf_l(%rip), %xmm3, %xmm0
-	vpxor	%xmm3, %xmm0, %xmm3
-	vpshufb	__shuf_l(%rip), %xmm3, %xmm0
-	vpxor	%xmm3, %xmm0, %xmm3
-	vpxor	%xmm3, %xmm1, %xmm3
+  ADDQ $32, %rdi
+  RET
 
-	vmovdqu	%xmm3, 16(%rdi)
-
-	addq	$32, %rdi
-	retq
-
-	.globl	_Rijndael_k8w4_expandkey
+.globl _Rijndael_k8w4_expandkey
 _Rijndael_k8w4_expandkey:
-	vzeroupper
+  VZEROUPPER
 
-	vmovdqu	(%rsi), %xmm2
-	vmovdqu	16(%rsi), %xmm3
+  VMOVDQU 0(%rsi), %xmm0
+  VMOVDQU 16(%rsi), %xmm3
 
-	vmovdqu	__rc(%rip), %xmm4
+  VMOVDQU __rc(%rip), %xmm4
 
-	vmovdqu	%xmm2, (%rdi)
-	vmovdqu	%xmm3, 16(%rdi)
-	addq	$32, %rdi
-
-
-	callq	.L_DR
-	callq	.L_DR
-	callq	.L_DR
-	callq	.L_DR
-	callq	.L_DR
-	callq	.L_DR
+  VMOVDQU %xmm0, 0(%rdi)
+  VMOVDQU %xmm3, 16(%rdi)
+  ADD $32, %rdi
 
 
-	vaesenclast	%xmm4, %xmm3, %xmm1
-	vpshufb	__shuf_2(%rip), %xmm1, %xmm1
+  CALL .L_DR
+  CALL .L_DR
+  CALL .L_DR
+  CALL .L_DR
+  CALL .L_DR
+  CALL .L_DR
 
-	vpshufb	__shuf_l(%rip), %xmm2, %xmm0
-	vpxor	%xmm2, %xmm0, %xmm2
-	vpshufb	__shuf_l(%rip), %xmm2, %xmm0
-	vpxor	%xmm2, %xmm0, %xmm2
-	vpshufb	__shuf_l(%rip), %xmm2, %xmm0
-	vpxor	%xmm2, %xmm0, %xmm2
-	vpxor	%xmm2, %xmm1, %xmm2
 
-	vmovdqu	%xmm2, (%rdi)
+  VAESENCLAST %xmm4, %xmm3, %xmm1
+  VPSHUFB __shuf_2(%rip), %xmm1, %xmm1
 
-	vzeroall
-	xorq	%rdi, %rdi
-	xorq	%rsi, %rsi
-	retq
+  linearmix %xmm0, %xmm1
+  VMOVDQU %xmm0, 0(%rdi)
+
+  VZEROALL
+  XOR %rdi, %rdi
+  XOR %rsi, %rsi
+  RET

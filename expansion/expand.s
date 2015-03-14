@@ -6,9 +6,9 @@
  * Ack:         Agner Fog's instruction tables.
  */
 
-#define T1   %xmm0
+#define T1   %xmm2
 #define T2   %xmm1
-#define KEY1 %xmm2
+#define KEY1 %xmm0
 #define KEY2 %xmm3
 #define RC   %xmm4
 

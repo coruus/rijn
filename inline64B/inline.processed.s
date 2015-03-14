@@ -3,7 +3,7 @@
 # 1 "inline.s" 2
 # 48 "inline.s"
 .data
-.align 5
+.align 6
 __rc:
   .byte 1, 0, 0, 0
   .byte 1, 0, 0, 0
@@ -66,11 +66,12 @@ __eight:
 .macro xorlast xx, block, cc, ll
   VMOVDQU \xx, %xmm6
   MOVQ $\cc, %rcx
-  CMPQ $\ll, %rdx
-  JL last
-  VPXOR \block*16(%rsi), %xmm13, %xmm13
-  VMOVDQU \xx, \block*16(%rdi)
-  done
+  SUBQ $\cc, %rdx
+  CMPQ $16, %rdx
+  JL mopup
+    VPXOR \block*16(%rsi), \xx, %xmm6
+    VMOVDQU %xmm6, \block*16(%rdi)
+    done
 .endm
 
 .macro expand1
@@ -97,6 +98,8 @@ __eight:
   RET
 .endm
 
+
+# 1 "./tedious-macros.s" 1
 .macro enc8 key
     VAESENC \key, %xmm6, %xmm6
     VAESENC \key, %xmm7, %xmm7
@@ -163,21 +166,17 @@ __eight:
   VAESENCLAST \key, %xmm12, %xmm12
   VAESENCLAST \key, %xmm13, %xmm13
 .endm
-
+# 145 "inline.s" 2
 
 .text
-
-
-
 .align 5
-
-.align 5
-.globl _aes256_ctr4
-_aes256_ctr4:
+.globl _aes256_ctr
+_aes256_ctr:
   CMPQ $0, %rdx
   JZ ret
   VZEROUPPER
-
+  CMPQ $128, %rdx
+  JG _expand_key
 
 
 
@@ -226,21 +225,22 @@ _aes256_ctr4:
   VAESENCLAST %xmm5, %xmm0, %xmm0
 
   CMPQ $16, %rdx
-  JLE fly1
+    JLE fly1
   CMPQ $32, %rdx
-  JLE fly2
+    JLE fly2
   CMPQ $48, %rdx
-  JLE fly3
+    JLE fly3
   CMPQ $64, %rdx
-  JLE fly4
+    JLE fly4
   CMPQ $80, %rdx
-  JLE fly5
+    JLE fly5
   CMPQ $96, %rdx
-  JLE fly6
+    JLE fly6
   CMPQ $112, %rdx
-  JLE fly7
+    JLE fly7
   CMPQ $128, %rdx
-  JLE fly8
+    JLE fly8
+  done # not handled
 
 fly4:
   enc4 %xmm3
@@ -275,44 +275,30 @@ fly4:
   xorlast %xmm9, 3, 48, 64
 
 .align 4
-done:
-
-  VZEROALL
-  XOR %rcx, %rcx
-  XOR %rcx, %rcx
-  XOR %rax, %rax
-  XOR %rcx, %rcx
-  XOR %rdx, %rdx
-  XOR %r8, %r8
 ret:
   RET
 
-last:
-  SUBQ %rcx, %rdx
-  CMPQ $16, %rdx
-  JL mopup
-  VPXOR (%rsi, %rcx), %xmm6, %xmm6
-  VMOVDQU %xmm6, (%rdi, %rcx)
-
+.align 4
 mopup:
   VMOVQ %xmm6, %rax
   CMPQ $8, %rdx
   JL mopup_loop
-  VPSHUFD $0xe, %xmm6, %xmm6 # %xmm6[0:4] = {%xmm6[2], %xmm6[3], ... }
+    VPSHUFD $0xe, %xmm6, %xmm6 # %xmm6[0:4] = {%xmm6[2], %xmm6[3], ... }
 
-  XORQ (%rsi, %rcx), %rax
-  MOVQ %rax, (%rdi, %rcx)
-  ADDQ $8, %rcx
+    XORQ (%rsi, %rcx), %rax
+    MOVQ %rax, (%rdi, %rcx)
+    ADDQ $8, %rcx
   SUBQ $8, %rdx
   JZ done
 
   VMOVQ %xmm6, %rax
 
-mopup_loop:
-  XORB (%rsi, %rcx), %al
-  MOVB %al, (%rdi, %rcx)
-  RORX $8, %rax, %rax
-  INC %rcx
+  .align 4
+  mopup_loop:
+    XORB (%rsi, %rcx), %al
+    MOVB %al, (%rdi, %rcx)
+    RORX $8, %rax, %rax
+    INC %rcx
   DEC %rdx
   JNZ mopup_loop
 
@@ -450,7 +436,6 @@ fly7:
   expand1
   enc7 %xmm3
 
-
   VAESENCLAST %xmm2, %xmm6, %xmm6
   VAESENCLAST %xmm2, %xmm7, %xmm7
   VAESENCLAST %xmm2, %xmm8, %xmm8
@@ -503,7 +488,6 @@ fly3:
 
   xorlast %xmm8, 2, 32, 48
 
-
 fly2:
   enc2 %xmm3
   linearmix %xmm3, %xmm0
@@ -529,7 +513,6 @@ fly2:
   VMOVDQU %xmm6, 0*16(%rdi)
 
   xorlast %xmm7, 1, 16, 32
-
 
 fly1:
   VAESENC %xmm3, %xmm6, %xmm6

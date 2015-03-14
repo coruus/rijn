@@ -46,7 +46,7 @@
 #define OFFSET %rbx
 
 .data
-.align 5
+.align 6
 __rc:
   .byte 1, 0, 0, 0
   .byte 1, 0, 0, 0
@@ -109,11 +109,12 @@ __eight:
 .macro xorlast xx, block, cc, ll
   VMOVDQU \xx, X0
   MOVQ $\cc, %rcx
-  CMPQ $\ll, LEN
-  JL last
-  VPXOR \block*16(IN), X7, X7
-  VMOVDQU \xx, \block*16(OUT)
-  done
+  SUBQ $\cc, LEN
+  CMPQ $16, LEN
+  JL mopup
+    VPXOR \block*16(IN), \xx, X0
+    VMOVDQU X0, \block*16(OUT)
+    done
 .endm
 
 .macro expand1
@@ -140,89 +141,19 @@ __eight:
   RET
 .endm
 
-.macro enc8 key
-    VAESENC   \key, X0, X0
-    VAESENC   \key, X1, X1
-    VAESENC   \key, X2, X2
-    VAESENC   \key, X3, X3
-    VAESENC   \key, X4, X4
-    VAESENC   \key, X5, X5
-    VAESENC   \key, X6, X6
-    VAESENC   \key, X7, X7
-.endm
-
-.macro enc7 key
-    VAESENC   \key, X0, X0
-    VAESENC   \key, X1, X1
-    VAESENC   \key, X2, X2
-    VAESENC   \key, X3, X3
-    VAESENC   \key, X4, X4
-    VAESENC   \key, X5, X5
-    VAESENC   \key, X6, X6
-.endm
-
-.macro enc6 key
-    VAESENC   \key, X0, X0
-    VAESENC   \key, X1, X1
-    VAESENC   \key, X2, X2
-    VAESENC   \key, X3, X3
-    VAESENC   \key, X4, X4
-    VAESENC   \key, X5, X5
-.endm
-
-.macro enc5 key
-    VAESENC   \key, X0, X0
-    VAESENC   \key, X1, X1
-    VAESENC   \key, X2, X2
-    VAESENC   \key, X3, X3
-    VAESENC   \key, X4, X4
-.endm
-
-.macro enc4 key
-    VAESENC   \key, X0, X0
-    VAESENC   \key, X1, X1
-    VAESENC   \key, X2, X2
-    VAESENC   \key, X3, X3
-.endm
-
-.macro enc3 key
-    VAESENC   \key, X0, X0
-    VAESENC   \key, X1, X1
-    VAESENC   \key, X2, X2
-.endm
-
-.macro enc2 key
-    VAESENC   \key, X0, X0
-    VAESENC   \key, X1, X1
-.endm
-
-.macro last8 key
-  VAESENCLAST      \key, X0, X0
-  VAESENCLAST      \key, X1, X1
-  VAESENCLAST      \key, X2, X2
-  VAESENCLAST      \key, X3, X3
-  VAESENCLAST      \key, X4, X4
-  VAESENCLAST      \key, X5, X5
-  VAESENCLAST      \key, X6, X6
-  VAESENCLAST      \key, X7, X7
-.endm
-
+#include "tedious-macros.s"
 
 .text
-
-/* By 8 blocks, performance is linear.
- */
 .align 5
-
-.align 5
-.globl _aes256_ctr4
-_aes256_ctr4:
+.globl _aes256_ctr
+_aes256_ctr:
   CMPQ $0, LEN
   JZ ret
   VZEROUPPER
+  CMPQ $128, LEN
+  JG _expand_key
 //  CMPQ $128, LEN
   //JG expand_key_prelude
-
 
   VMOVDQU    0(KEY), KEY1
   VMOVDQU   16(KEY), KEY2
@@ -269,21 +200,22 @@ _aes256_ctr4:
   VAESENCLAST   ZERO,   T0, T0
 
   CMPQ $16, LEN
-  JLE fly1
+    JLE fly1
   CMPQ $32, LEN
-  JLE fly2
+    JLE fly2
   CMPQ $48, LEN
-  JLE fly3
+    JLE fly3
   CMPQ $64, LEN
-  JLE fly4
+    JLE fly4
   CMPQ $80, LEN
-  JLE fly5
+    JLE fly5
   CMPQ $96, LEN
-  JLE fly6
+    JLE fly6
   CMPQ $112, LEN
-  JLE fly7
+    JLE fly7
   CMPQ $128, LEN
-  JLE fly8
+    JLE fly8
+  done # not handled
 
 fly4:
   enc4 KEY2
@@ -318,44 +250,30 @@ fly4:
   xorlast X3, 3, 48, 64
 
 .align 4
-done:
-  // Zeroize registers.
-  VZEROALL
-  XOR KS, KS
-  XOR KEY, KEY
-  XOR %rax, %rax
-  XOR %rcx, %rcx
-  XOR LEN, LEN
-  XOR NC, NC
 ret:
   RET
 
-last:
-  SUBQ %rcx, LEN
-  CMPQ $16, LEN
-  JL mopup
-  VPXOR (IN, %rcx), X0, X0
-  VMOVDQU X0, (OUT, %rcx)
-
+.align 4
 mopup:
   VMOVQ X0, %rax
   CMPQ $8, LEN
   JL mopup_loop
-  VPSHUFD $0xe, X0, X0    # X0[0:4] = {X0[2], X0[3], ... }
+    VPSHUFD $0xe, X0, X0    # X0[0:4] = {X0[2], X0[3], ... }
 
-  XORQ (IN, %rcx), %rax
-  MOVQ %rax, (OUT, %rcx)
-  ADDQ $8, %rcx
+    XORQ (IN, %rcx), %rax
+    MOVQ %rax, (OUT, %rcx)
+    ADDQ $8, %rcx
   SUBQ $8, LEN
   JZ done
 
   VMOVQ X0, %rax
 
-mopup_loop:
-  XORB (IN, %rcx), %al
-  MOVB %al, (OUT, %rcx)
-  RORX $8, %rax, %rax
-  INC %rcx
+  .align 4
+  mopup_loop:
+    XORB (IN, %rcx), %al
+    MOVB %al, (OUT, %rcx)
+    RORX $8, %rax, %rax
+    INC %rcx
   DEC LEN
   JNZ mopup_loop
 
@@ -493,7 +411,6 @@ fly7:
   expand1
   enc7 KEY2
 
-  
   VAESENCLAST      KEY1, X0, X0
   VAESENCLAST      KEY1, X1, X1
   VAESENCLAST      KEY1, X2, X2
@@ -546,7 +463,6 @@ fly3:
 
   xorlast X2, 2, 32, 48
 
-
 fly2:
   enc2      KEY2
   linearmix KEY2,   T0
@@ -572,7 +488,6 @@ fly2:
   VMOVDQU X0, 0*16(OUT)
 
   xorlast X1, 1, 16, 32
-
 
 fly1:
   VAESENC   KEY2, X0, X0

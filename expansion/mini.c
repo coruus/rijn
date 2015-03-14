@@ -21,8 +21,8 @@ int test_expansion(void) {
   uint32_t ks_ossl[60] = {0};
   uint32_t ks_this[60] = {0};
   AesKey aeskey;
-  //aesni_set_encrypt_key((void*)test_k, 256, &aeskey);
-  intel_aes_encrypt_init_256(aeskey.rd_key, test_k);
+  aesni_set_encrypt_key((void*)test_k, 256, &aeskey);
+  //intel_aes_encrypt_init_256(aeskey.rd_key, test_k);
   Rijndael_k8w4_expandkey(ks_this, test_k);
 
 #ifdef APPLE_LIBCRYPTO_MADNESS
