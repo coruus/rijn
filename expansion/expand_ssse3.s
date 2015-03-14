@@ -53,15 +53,15 @@ __shuf_l:
 
 .macro linearmix key, new
   MOVDQA     \key, T1
-  PSHUFB   SHUF_L, T1
+  PSLLDQ   $4, T1
   PXOR         T1, \key
 
   MOVDQA     \key, T1
-  PSHUFB   SHUF_L, T1
+  PSLLDQ   $4, T1
   PXOR         T1, \key
 
   MOVDQA     \key, T1
-  PSHUFB   SHUF_L, T1
+  PSLLDQ   $4, T1
   PXOR         T1, \key
 
   PXOR      \new, \key
@@ -70,24 +70,7 @@ __shuf_l:
 .text
 .L_DR:
 //__Rijndael_k8w4_expandkey_doubleround:
-  MOVDQA        KEY2, T2
-  AESENCLAST      RC, T2
-  PSHUFB      SHUF_2, T2
-  // Shift the round constant, to prepare for the next round
-  PSLLD           $1, RC
-  
-  linearmix KEY1,   T2
-  MOVDQU  KEY1,  0(KS)
 
-  PXOR           T1, T1
-  MOVDQA       KEY1, T2
-  PSHUFB     SHUF_1, T2
-  AESENCLAST     T1, T2
-
-  linearmix KEY2,   T2
-  MOVDQU    KEY2, 16(KS)
-
-  ADDQ $32, KS
   RET
 
 .globl _Rijndael_k8w4_expandkey
@@ -101,15 +84,29 @@ _Rijndael_k8w4_expandkey:
   MOVDQU      KEY2, 16(KS)
   ADD          $32, KS
 
-  // Rounds 2..13
-  CALL .L_DR
-  CALL .L_DR
-  CALL .L_DR
-  CALL .L_DR
-  CALL .L_DR
-  CALL .L_DR
+  MOV $6, %rax
+  Loop_expand:
+    MOVDQA        KEY2, T2
+    AESENCLAST      RC, T2
+    PSHUFB      SHUF_2, T2
+    // Shift the round constant, to prepare for the next round
+    PSLLD           $1, RC
+    
+    linearmix KEY1,   T2
+    MOVDQU  KEY1,  0(KS)
+  
+    PXOR           T1, T1
+    MOVDQA       KEY1, T2
+    PSHUFD     $255, T2, T2
+    AESENCLAST     T1, T2
+  
+    linearmix KEY2,   T2
+    MOVDQU    KEY2, 16(KS)
+  
+    ADDQ $32, KS
+    DEC %rax
+    JNZ Loop_expand
 
-  // Round 14
   AESENCLAST     RC, KEY2
   PSHUFB     SHUF_2, KEY2
   
