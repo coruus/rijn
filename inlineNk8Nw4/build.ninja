@@ -12,37 +12,47 @@ cflags = -I. -Wextra -O3 $carch $csan
 
 rule asm
   command = yasm $asm_arch $in -o $out
+rule gas
+  command = clang -c $in -o $out
 rule static
   command = libtool -static -o $out $in
 rule cexec
   command = clang $cflags -o $out $in
 rule cc
   command = clang $cflags -c -o $out $in
-rule run
-  command = $in $inflags > $out
 rule cpp
   command = clang -E $in > $out
+rule run
+  command = $in $inflags > $out
 rule pyrun
   command = python $in $pyargs > $out
 rule diff
   command = diff $in > $out
+rule ginger
+  command = ./ginger.py $in > $out
 
 #rule ginger
 #  command = ./scripts/ginger.py $in > $out
 
-build $b/rijn_k32b32.o: asm rijn_k32b32.s
+build partial.s: ginger partial.ginger.s
+build testctr.c: ginger testctr.ginger.c
+build aesctr.h:  ginger  aesctr.ginger.h
+
+build $b/partial.s: cpp partial.s
+build $b/partial.o: gas $b/partial.s
+build $b/test.out:  cexec $b/partial.o libcrypto.a testctr.c
+
+#build $b/rijn_k32b32.o: asm rijn_k32b32.s
 #build $b/rijn_k32ks.o:  asm rijn_k32ks.s
-build $b/rijn_k32ks.s: cpp expand2.s
-build $b/rijn_k32ks.o: cc $b/rijn_k32ks.s
-build $b/rijn_ctr.o:    cc  rijn_ctr.c
-build $b/rijn.a: static $b/rijn_ctr.o $b/rijn_k32ks.o $b/rijn_k32b32.o
-
-build $b/test: cexec $b/rijn.a test_rijn256ctr.c
-
-build $b/ctr_python.txt: pyrun py/ctr_testgen.py
-  pyargs = 1530
-build $b/ctr_c.txt: run $b/test
-build $b/ctrdiff.txt: diff $b/ctr_python.txt $b/ctr_c.txt
+#build $b/rijn_ctr.o:    cc  rijn_ctr.c
+#build $b/rijn.a: static $b/rijn_ctr.o $b/rijn_k32ks.o $b/rijn_k32b32.o
+#
+#build $b/test: cexec $b/rijn.a test_rijn256ctr.c
+#
+#build $b/ctr_python.txt: pyrun py/ctr_testgen.py
+#  pyargs = 1530
+#build $b/ctr_c.txt: run $b/test
+#build $b/ctrdiff.txt: diff $b/ctr_python.txt $b/ctr_c.txt
 
 #build $b/test: cexec rijn-api.c $b/rijn.a
 #build $b/time: cexec test_k32b32.c $b/rijn.a

@@ -106,6 +106,7 @@ Rijndael_k32b32_expandkey:
   k32_expand 0x20
   k32_expand 0x40
   k32_expand 0x80
+
   k32_expand 0x1b
   k32_expand 0x36
   k32_expand 0x6c
